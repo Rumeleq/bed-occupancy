@@ -4,7 +4,7 @@ import sys
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
-from elevenlabs.conversational_ai.conversation import Conversation
+from elevenlabs.conversational_ai.conversation import Conversation, ConversationInitiationData
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
 load_dotenv()
@@ -24,6 +24,16 @@ if not agent_id:
 
 client = ElevenLabs(api_key=api_key)
 
+config = ConversationInitiationData(
+    dynamic_variables={
+        "patient_name": "Jan",
+        "patient_surname": "Topolewski",
+        "patient_sickness": "zapalenie kolana",
+        "current_visit_day": 10,
+        "suggested_appointment_day": 5,
+    }
+)
+
 conversation = Conversation(
     # API client and agent ID.
     client,
@@ -32,6 +42,8 @@ conversation = Conversation(
     requires_auth=bool(api_key),
     # Use the default audio interface.
     audio_interface=DefaultAudioInterface(),
+    # parameters
+    config=config,
     # Simple callbacks that print the conversation to the console.
     callback_agent_response=lambda response: print(f"Agent: {response}"),
     callback_agent_response_correction=lambda original, corrected: print(f"Agent: {original} -> {corrected}"),
