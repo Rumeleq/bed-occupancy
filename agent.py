@@ -1,12 +1,26 @@
 import os
 import signal
+import sys
 
+from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
 from elevenlabs.conversational_ai.conversation import Conversation
 from elevenlabs.conversational_ai.default_audio_interface import DefaultAudioInterface
 
+load_dotenv()
+
 agent_id = os.getenv("AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
+
+
+# Check if required environment variables are set
+if not api_key:
+    print("Error: ELEVENLABS_API_KEY environment variable is not set")
+    sys.exit(1)
+
+if not agent_id:
+    print("Error: AGENT_ID environment variable is not set")
+    sys.exit(1)
 
 client = ElevenLabs(api_key=api_key)
 
@@ -26,9 +40,13 @@ conversation = Conversation(
     # callback_latency_measurement=lambda latency: print(f"Latency: {latency}ms"),
 )
 
-conversation.start_session()
 
-signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
-
-conversation_id = conversation.wait_for_session_end()
-print(f"Conversation ID: {conversation_id}")
+try:
+    conversation.start_session()
+    signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
+    conversation_id = conversation.wait_for_session_end()
+    print(f"Conversation ID: {conversation_id}")
+except Exception as e:
+    print(f"Error: {e}")
+    conversation.end_session()
+    sys.exit(1)
