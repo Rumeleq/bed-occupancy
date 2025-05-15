@@ -54,34 +54,26 @@ def prepare_conversation(
         audio_interface=DefaultAudioInterface(),
         config=config,
         callback_agent_response=lambda response: print(f"Agent: {response}"),
-        callback_agent_response_correction=lambda original, corrected: print(f"Agent: {original} -> {corrected}"),
+        callback_agent_response_correction=lambda original, corrected: print(f"Agent corrected: {corrected}"),
         callback_user_transcript=lambda transcript: print(f"User: {transcript}"),
     )
 
 
-conversation = prepare_conversation(
-    patient_name="Jan",
-    patient_surname="Topolewski",
-    patient_sickness="zapalenie kolana",
-    current_visit_day=10,
-    suggested_appointment_day=5,
-)
-try:
-    conversation.start_session()
-    signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
-    conversation_id = conversation.wait_for_session_end()
-    print(f"Conversation ID: {conversation_id}")
+def establish_voice_conversation(conversation: Conversation) -> str | None:
+    # conversation = prepare_conversation(
+    #     patient_name="Jan",
+    #     patient_surname="Topolewski",
+    #     patient_sickness="zapalenie kolana",
+    #     current_visit_day=10,
+    #     suggested_appointment_day=5
+    # )
+    try:
+        conversation.start_session()
+        signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
+        conversation_id = conversation.wait_for_session_end()
+        return conversation_id
 
-    conversation_data = client.conversational_ai.get_conversation(conversation_id=conversation_id)
-
-    print(
-        json.loads(conversation_data.analysis.json())
-        .get("data_collection_results", {})
-        .get("consent_to_change_the_date", {})
-        .get("value", None)
-    )
-
-except Exception as e:
-    print(f"Error: {e}")
-    conversation.end_session()
-    sys.exit(1)
+    except Exception as e:
+        print(f"Error: {e}")
+        conversation.end_session()
+        return None
