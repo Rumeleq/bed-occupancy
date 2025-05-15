@@ -47,13 +47,29 @@ def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: s
     # )
     # conversation_id = establish_voice_conversation(conversation)
     # return check_patient_consent_to_reschedule(conversation_id)
+    return True
 
 
 def agent_call(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int):
     st.session_state.consent = handle_patient_rescheduling(
         name=name, surname=surname, pesel=pesel, sickness=sickness, old_day=old_day, new_day=new_day
     )
-    response = requests.get("http://backend:8000/move-patient-to-bed-assignment")
+    if st.session_state.consent:
+        response = requests.get("http://backend:8000/move-patient-to-bed-assignment")
+        global queue_df, bed_df
+
+        if not bed_df.empty:
+            # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
+            #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
+            st.dataframe(bed_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("No bed assignments found.")
+
+        st.sidebar.subheader("Patients in queue")
+        if not queue_df.empty:
+            st.sidebar.dataframe(queue_df, use_container_width=True, hide_index=True)
+        else:
+            st.sidebar.info("No patients found in the queue.")
 
 
 def get_list_of_tables() -> Optional[Dict]:
@@ -108,7 +124,17 @@ if len(bed_df[bed_df["patient_id"] == 0]) > 0:
     pesel = queue_df["PESEL"][st.session_state.queue_id][-3:]
     response = requests.get("http://backend:8000/get-patient-data", params={"patient_id": st.session_state.patient_id})
     st.session_state.consent = False
-    st.sidebar.button("Call patient 📞", on_click=agent_call)
+    st.sidebar.button(
+        "Call patient 📞",
+        on_click=lambda: agent_call(
+            name=name,
+            surname=surname,
+            pesel=pesel,
+            sickness=response.json()["sickness"],
+            old_day=response.json()["old_day"],
+            new_day=response.json()["new_day"],
+        ),
+    )
 
 st.sidebar.subheader("Patients in queue")
 if not queue_df.empty:

@@ -80,6 +80,7 @@ def get_bed_assignments_and_queue():
 
         patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Unoccupied"
         sickness = patient.sickness if patient else "Unoccupied"
+        pesel = patient.pesel if patient else "Unoccupied"
         days_of_stay = ba.days_of_stay if ba else 0
 
         bed_assignments.append(
@@ -88,6 +89,7 @@ def get_bed_assignments_and_queue():
                 "patient_id": ba.patient_id if ba else 0,
                 "patient_name": patient_name,
                 "sickness": sickness,
+                "PESEL": pesel,
                 "days_of_stay": days_of_stay,
             }
         )
@@ -100,6 +102,7 @@ def get_bed_assignments_and_queue():
                 "place_in_queue": entry.queue_id,
                 "patient_id": patient.patient_id,
                 "patient_name": f"{patient.first_name} {patient.last_name}",
+                "PESEL": f"...{patient.pesel[-3:]}",
             }
         )
     return BedAssignmentsAndQueue(BedAssignment=bed_assignments, PatientQueue=queue_data)
@@ -179,9 +182,10 @@ def get_tables():
                     delete_patient_by_id_from_queue(patient_id)
                     bed_iterator += 1
 
-            patients_to_move = patients_consent_dictionary[day_for_simulation]
-            for patient in patients_to_move:
-                assign_bed_to_patient(patient["bed_id"], patient["patient_id"], days, should_log)
+            if day_for_simulation in patients_consent_dictionary:
+                patients_to_move = patients_consent_dictionary[day_for_simulation]
+                for patient in patients_to_move:
+                    assign_bed_to_patient(patient["bed_id"], patient["patient_id"], days, should_log)
 
         bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
