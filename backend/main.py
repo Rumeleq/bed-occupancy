@@ -67,7 +67,7 @@ def get_tables():
         for ba in session.query(BedAssignment).all():
             ba.days_of_stay -= 1
 
-    def print_patients_to_be_released(log: bool):
+    def print_patients_to_be_released(log: bool) -> int:
         patients_to_release = (
             session.query(Patient)
             .filter(Patient.patient_id.in_(session.query(BedAssignment.patient_id).filter(BedAssignment.days_of_stay <= 0)))
@@ -78,6 +78,7 @@ def get_tables():
                 "Patients to be released from hospital:\n"
                 + "\n".join(f"Patient ID: {p.patient_id}, Name: {p.first_name} {p.last_name}" for p in patients_to_release)
             )
+        return len(patients_to_release)
 
     def delete_patients_to_be_released():
         session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0).delete(synchronize_session="auto")
@@ -119,7 +120,7 @@ def get_tables():
             should_give_no_shows = iteration == day_for_simulation - 2
 
             decrement_days_of_stay()
-            print_patients_to_be_released(log=should_log)
+            number_of_patients_to_release = print_patients_to_be_released(log=should_log)
             delete_patients_to_be_released()
 
             assigned_beds = session.query(BedAssignment.bed_id).subquery()
@@ -128,7 +129,9 @@ def get_tables():
             queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
             bed_iterator = 0
 
-            for entry in queue:
+            for i, entry in enumerate(queue):
+                if i + 1 > number_of_patients_to_release:
+                    break
                 patient_id = entry.patient_id
                 if bed_iterator >= len(bed_ids):
                     break
