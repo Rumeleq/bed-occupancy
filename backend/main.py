@@ -21,6 +21,7 @@ day_for_simulation = 1
 last_change = 1
 session = get_session()
 random.seed(43)
+patients_consent_dictionary: dict[int, list[int]] = {}
 
 
 @app.get("/get-current-day")
@@ -192,24 +193,27 @@ def get_tables():
         return {"error": "Server Error", "message": error_message}
 
 
-@app.get("/create-voice-call", response_model=BedAssignmentsAndQueue)
-def create_voice_call(patient_id: int) -> BedAssignmentsAndQueue:
-    global session, day_for_simulation
+@app.get("/get-patient-data")
+def get_patient_data(patient_id: int):
     patient = session.query(Patient).filter_by(patient_id=patient_id).first()
     queue_id = session.query(PatientQueue).filter_by(patient_id=patient_id).first().queue_id
-
-    logger.info(f"A call for patient {patient.first_name} was created.")
     old_day, new_day = day_for_simulation + math.ceil(queue_id // random.randint(2, 4)), day_for_simulation
-    logger.info(f"current day of visit: {old_day}, new day: {new_day}")
+    return {"sickness": patient.sickness, "old_day": old_day, "new_day": new_day}
 
-    # consent = handle_patient_rescheduling(patient.first_name, patient.last_name, patient.sickness, old_day, new_day)
-    consent = True
-    if consent:
-        delete_patient_by_id_from_queue(patient.patient_id)
 
-        bed_id: int = get_first_free_bed()
-        days = random.randint(1, 7)
-        assign_bed_to_patient(bed_id, patient.patient_id, days, True)
+@app.get("/move-patient-to-bed-assignment", response_model=BedAssignmentsAndQueue)
+def move_patient_to_bed_assignment(patient_id: int) -> BedAssignmentsAndQueue:
+    global session
+    delete_patient_by_id_from_queue(patient_id)
+
+    bed_id: int = get_first_free_bed()
+    days = random.randint(1, 7)
+    assign_bed_to_patient(bed_id, patient_id, days, True)
+
+    if day_for_simulation in patients_consent_dictionary:
+        patients_consent_dictionary[day_for_simulation].append(patient_id)
+    else:
+        patients_consent_dictionary[day_for_simulation] = [patient_id]
 
     bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 

@@ -37,16 +37,23 @@ def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: s
     :param new_day: The suggested day for the new appointment.
     :return: A boolean indicating whether the patient consented to the rescheduling.
     """
-    conversation = prepare_conversation(
-        patient_name=name,
-        patient_surname=surname,
-        pesel=pesel,
-        patient_sickness=sickness,
-        current_visit_day=old_day,
-        suggested_appointment_day=new_day,
+    # conversation = prepare_conversation(
+    #     patient_name=name,
+    #     patient_surname=surname,
+    #     pesel=pesel,
+    #     patient_sickness=sickness,
+    #     current_visit_day=old_day,
+    #     suggested_appointment_day=new_day,
+    # )
+    # conversation_id = establish_voice_conversation(conversation)
+    # return check_patient_consent_to_reschedule(conversation_id)
+
+
+def agent_call(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int):
+    st.session_state.consent = handle_patient_rescheduling(
+        name=name, surname=surname, pesel=pesel, sickness=sickness, old_day=old_day, new_day=new_day
     )
-    conversation_id = establish_voice_conversation(conversation)
-    return check_patient_consent_to_reschedule(conversation_id)
+    response = requests.get("http://backend:8000/move-patient-to-bed-assignment")
 
 
 def get_list_of_tables() -> Optional[Dict]:
@@ -99,12 +106,9 @@ if len(bed_df[bed_df["patient_id"] == 0]) > 0:
     name = queue_df["patient_name"][st.session_state.queue_id].split()[0]
     surname = queue_df["patient_name"][st.session_state.queue_id].split()[1]
     pesel = queue_df["PESEL"][st.session_state.queue_id][-3:]
-    st.sidebar.button(
-        "Call patient 📞",
-        on_click=lambda: handle_patient_rescheduling(
-            name=name, surname=surname, pesel=pesel, sickness="zapalenie kolana", old_day=10, new_day=5
-        ),
-    )
+    response = requests.get("http://backend:8000/get-patient-data", params={"patient_id": st.session_state.patient_id})
+    st.session_state.consent = False
+    st.sidebar.button("Call patient 📞", on_click=agent_call)
 
 st.sidebar.subheader("Patients in queue")
 if not queue_df.empty:
