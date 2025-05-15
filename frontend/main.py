@@ -99,7 +99,7 @@ else:
 
 if len(bed_df[bed_df["patient_id"] == 0]) > 0:
     st.session_state.queue_id = 1
-    st.session_state.patient_id = queue_df["patient_id"][st.session_state.queue_id]
+    st.session_state.patient_id = queue_df.loc[st.session_state.queue_id - 1, "patient_id"]
     st.sidebar.button("Call patient 📞", on_click=lambda: call_patient(st.session_state.patient_id))
 
 

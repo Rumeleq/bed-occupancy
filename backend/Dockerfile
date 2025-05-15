@@ -2,7 +2,11 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get upgrade -y
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libportaudio2 \
+    libportaudiocpp0 \
+    portaudio19-dev
 
 COPY requirements.txt .
 
