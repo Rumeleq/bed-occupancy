@@ -5,6 +5,7 @@ import traceback
 from pathlib import Path
 from typing import List
 
+from agent import check_patient_consent_to_reschedule, establish_voice_conversation, prepare_conversation
 from db_operations import get_session
 from fastapi import FastAPI, Query
 from models import Bed, BedAssignment, ListOfTables, NoShow, Patient, PatientQueue
@@ -18,6 +19,29 @@ logging.config.dictConfig(config)
 app = FastAPI()
 day_for_simulation = 1
 last_change = 1
+
+
+def handle_patient_rescheduling(name: str, surname: str, sickness: str, old_day: int, new_day: int) -> bool:
+    """
+    Handles the process of rescheduling a patient's appointment by initiating a voice conversation
+    with the patient and analyzing their consent.
+
+    :param name: The first name of the patient.
+    :param surname: The last name of the patient.
+    :param sickness: The sickness or condition of the patient.
+    :param old_day: The current day of the patient's visit.
+    :param new_day: The suggested day for the new appointment.
+    :return: A boolean indicating whether the patient consented to the rescheduling.
+    """
+    conversation = prepare_conversation(
+        patient_name=name,
+        patient_surname=surname,
+        patient_sickness=sickness,
+        current_visit_day=old_day,
+        suggested_appointment_day=new_day,
+    )
+    conversation_id = establish_voice_conversation(conversation)
+    return check_patient_consent_to_reschedule(conversation_id)
 
 
 @app.get("/get-current-day")
