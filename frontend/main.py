@@ -43,6 +43,39 @@ def simulate_previous_day() -> None:
         st.session_state.error_message = f"Failed to connect to the server: {e}"
 
 
+def call_patient(patient_id: int) -> None:
+    try:
+        response = requests.get("http://backend:8000/create-voice-call", params={"patient_id": patient_id})
+        result = response.json()
+        bed_df = pd.DataFrame(result["BedAssignment"])
+        queue_df = pd.DataFrame(result["PatientQueue"])
+        global no_shows_df
+
+        st.sidebar.subheader("Patients in queue")
+        if not queue_df.empty:
+            st.sidebar.dataframe(queue_df, use_container_width=True)
+        else:
+            st.sidebar.info("No patients found in the queue.")
+
+        st.sidebar.subheader("Patients absent on a given day")
+        if not no_shows_df.empty:
+            st.sidebar.dataframe(no_shows_df, use_container_width=True)
+        else:
+            st.sidebar.info("No no-shows found.")
+
+        if st.session_state.day_for_simulation < 20:
+            st.button("➡️ Simulate Next Day", on_click=simulate_next_day)
+
+        if st.session_state.day_for_simulation > 1:
+            st.button("⬅️ Simulate Previous Day", on_click=simulate_previous_day)
+
+        if "error_message" in st.session_state and st.session_state.error_message:
+            st.error(st.session_state.error_message)
+
+    except Exception as e:
+        st.session_state.error_message = f"Failed to connect to the server: {e}"
+
+
 tables = get_list_of_tables()
 bed_df = pd.DataFrame(tables["BedAssignment"])
 queue_df = pd.DataFrame(tables["PatientQueue"])
@@ -54,6 +87,11 @@ if not bed_df.empty:
     st.dataframe(bed_df, use_container_width=True)
 else:
     st.info("No bed assignments found.")
+
+
+if len(queue_df[queue_df["patient_id"] == 0]) > 0:
+    st.sidebar.button("Call patient 📞")
+
 
 st.sidebar.subheader("Patients in queue")
 if not queue_df.empty:
