@@ -20,6 +20,7 @@ app = FastAPI()
 day_for_simulation = 1
 last_change = 1
 session = get_session()
+random.seed(43)
 
 
 @app.get("/get-current-day")
@@ -94,8 +95,6 @@ def get_tables():
         return f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
 
     try:
-        random.seed(43)
-
         if last_change == 1:
             logger.info(f"Current simulation day: {day_for_simulation}")
         else:
@@ -211,7 +210,7 @@ def handle_patient_rescheduling(name: str, surname: str, sickness: str, old_day:
 
 @app.get("/create-voice-call", response_model=ListOfTables)
 def create_voice_call(patient_id: int) -> ListOfTables:
-    session = get_session()
+    global session
     patient = session.query(Patient).filter_by(patient_id=patient_id).first()
 
     # consent = handle_patient_rescheduling(patient.first_name, patient.last_name, patient.sickness, old_day, new_day)
@@ -266,7 +265,7 @@ def create_voice_call(patient_id: int) -> ListOfTables:
 
 
 @app.post("/rollback-session", response_model=dict[str, int])
-def rollback_session():
+def rollback_session():  # in front-end: call at the end of the day (or before)
     global session
     session.rollback()
     return {"status": 200}
