@@ -13,8 +13,6 @@ load_dotenv()
 agent_id = os.getenv("AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
 
-
-# Check if required environment variables are set
 if not api_key:
     print("Error: ELEVENLABS_API_KEY environment variable is not set")
     sys.exit(1)
@@ -36,21 +34,14 @@ config = ConversationInitiationData(
 )
 
 conversation = Conversation(
-    # API client and agent ID.
     client,
     agent_id,
-    # Assume auth is required when API_KEY is set.
     requires_auth=bool(api_key),
-    # Use the default audio interface.
     audio_interface=DefaultAudioInterface(),
-    # parameters
     config=config,
-    # Simple callbacks that print the conversation to the console.
     callback_agent_response=lambda response: print(f"Agent: {response}"),
     callback_agent_response_correction=lambda original, corrected: print(f"Agent: {original} -> {corrected}"),
     callback_user_transcript=lambda transcript: print(f"User: {transcript}"),
-    # Uncomment if you want to see latency measurements.
-    # callback_latency_measurement=lambda latency: print(f"Latency: {latency}ms"),
 )
 
 
@@ -60,7 +51,6 @@ try:
     conversation_id = conversation.wait_for_session_end()
     print(f"Conversation ID: {conversation_id}")
 
-    # Retrieve conversation data using the conversation ID
     conversation_data = client.conversational_ai.get_conversation(conversation_id=conversation_id)
 
     print(
