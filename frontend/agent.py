@@ -33,13 +33,19 @@ client = ElevenLabs(api_key=api_key)
 
 
 def prepare_conversation(
-    patient_name: str, patient_surname: str, patient_sickness: str, current_visit_day: int, suggested_appointment_day: int
+    patient_name: str,
+    patient_surname: str,
+    pesel: str,
+    patient_sickness: str,
+    current_visit_day: int,
+    suggested_appointment_day: int,
 ) -> Conversation:
     """
     Prepares a conversation session with dynamic variables for a patient.
 
     :param patient_name: The first name of the patient.
     :param patient_surname: The last name of the patient.
+    :param pesel: The pesel of the patient.
     :param patient_sickness: The sickness or condition of the patient.
     :param current_visit_day: The current day of the patient's visit.
     :param suggested_appointment_day: The suggested day for the next appointment.
@@ -49,6 +55,7 @@ def prepare_conversation(
         dynamic_variables={
             "patient_name": patient_name,
             "patient_surname": patient_surname,
+            "pesel": pesel,
             "patient_sickness": patient_sickness,
             "current_visit_day": current_visit_day,
             "suggested_appointment_day": suggested_appointment_day,

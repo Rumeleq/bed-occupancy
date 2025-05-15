@@ -25,7 +25,7 @@ st.html(
 )
 
 
-def handle_patient_rescheduling(name: str, surname: str, sickness: str, old_day: int, new_day: int) -> bool:
+def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int) -> bool:
     """
     Handles the process of rescheduling a patient's appointment by initiating a voice conversation
     with the patient and analyzing their consent.
@@ -40,6 +40,7 @@ def handle_patient_rescheduling(name: str, surname: str, sickness: str, old_day:
     conversation = prepare_conversation(
         patient_name=name,
         patient_surname=surname,
+        pesel=pesel,
         patient_sickness=sickness,
         current_visit_day=old_day,
         suggested_appointment_day=new_day,
@@ -91,6 +92,19 @@ if not bed_df.empty:
     st.dataframe(bed_df, use_container_width=True, hide_index=True)
 else:
     st.info("No bed assignments found.")
+
+if len(bed_df[bed_df["patient_id"] == 0]) > 0:
+    st.session_state.queue_id = 1
+    st.session_state.patient_id = queue_df["patient_id"][st.session_state.queue_id]
+    name = queue_df["patient_name"][st.session_state.queue_id].split()[0]
+    surname = queue_df["patient_name"][st.session_state.queue_id].split()[1]
+    pesel = queue_df["PESEL"][st.session_state.queue_id][-3:]
+    st.sidebar.button(
+        "Call patient 📞",
+        on_click=lambda: handle_patient_rescheduling(
+            name=name, surname=surname, pesel=pesel, sickness="zapalenie kolana", old_day=10, new_day=5
+        ),
+    )
 
 st.sidebar.subheader("Patients in queue")
 if not queue_df.empty:
