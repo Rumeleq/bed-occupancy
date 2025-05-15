@@ -1,5 +1,6 @@
 import json
 import logging.config
+import math
 import random
 import traceback
 from pathlib import Path
@@ -158,11 +159,9 @@ def get_tables():
             bed_iterator = 0
 
             for i, entry in enumerate(queue):
-                if i + 1 > number_of_patients_to_release:
+                if i + 1 > number_of_patients_to_release or bed_iterator >= len(bed_ids):
                     break
                 patient_id = entry.patient_id
-                if bed_iterator >= len(bed_ids):
-                    break
                 will_come = random.choice([True] * 4 + [False])
                 if not will_come:
                     delete_patient_by_id_from_queue(patient_id)
@@ -219,15 +218,18 @@ def handle_patient_rescheduling(name: str, surname: str, sickness: str, old_day:
 
 @app.get("/create-voice-call", response_model=BedAssignmentsAndQueue)
 def create_voice_call(patient_id: int) -> BedAssignmentsAndQueue:
-    global session
+    global session, day_for_simulation
     patient = session.query(Patient).filter_by(patient_id=patient_id).first()
+    queue_id = session.query(PatientQueue).filter_by(patient_id=patient_id).first().queue_id
 
-    # consent = handle_patient_rescheduling(patient.first_name, patient.last_name, patient.sickness, old_day, new_day)
-    consent = True
+    logger.info(f"A call for patient {patient.first_name} was created.")
+    old_day, new_day = day_for_simulation + math.ceil(queue_id // random.randint(2, 4)), day_for_simulation
+    logger.info(f"current day of visit: {old_day}, new day: {new_day}")
+
+    consent = handle_patient_rescheduling(patient.first_name, patient.last_name, patient.sickness, old_day, new_day)
     if consent:
         delete_patient_by_id_from_queue(patient.patient_id)
 
-        random.seed(43)
         bed_id: int = get_first_free_bed()
         days = random.randint(1, 7)
         assign_bed_to_patient(bed_id, patient.patient_id, days, True)
