@@ -31,6 +31,7 @@ services:
 
   frontend:
     build: ./frontend
+    env_file: .env
     ports:
       - "127.0.0.1:8501:8501"
     depends_on:

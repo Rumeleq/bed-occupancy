@@ -16,7 +16,7 @@ agent_id = os.getenv("AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
 
 logger = logging.getLogger("hospital_logger")
-config_file = Path("../backend/logger_config.json")
+config_file = Path("./logger_config.json")
 with open(config_file) as f:
     config = json.load(f)
 logging.config.dictConfig(config)
@@ -61,9 +61,9 @@ def prepare_conversation(
         requires_auth=bool(api_key),
         audio_interface=DefaultAudioInterface(),
         config=config,
-        callback_agent_response=lambda response: logger.log(f"Agent: {response}"),
-        callback_agent_response_correction=lambda original, corrected: logger.log(f"Agent corrected: {corrected}"),
-        callback_user_transcript=lambda transcript: logger.log(f"User: {transcript}"),
+        callback_agent_response=lambda response: logger.info(f"Agent: {response}"),
+        callback_agent_response_correction=lambda original, corrected: logger.info(f"Agent corrected: {corrected}"),
+        callback_user_transcript=lambda transcript: logger.info(f"User: {transcript}"),
     )
 
 
