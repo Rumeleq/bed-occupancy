@@ -1,7 +1,9 @@
 import json
+import logging.config
 import os
 import signal
 import sys
+from pathlib import Path
 
 from dotenv import load_dotenv
 from elevenlabs.client import ElevenLabs
@@ -13,12 +15,18 @@ load_dotenv()
 agent_id = os.getenv("AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
 
+logger = logging.getLogger("hospital_logger")
+config_file = Path("logger_config.json")
+with open(config_file) as f:
+    config = json.load(f)
+logging.config.dictConfig(config)
+
 if not api_key:
-    print("Error: ELEVENLABS_API_KEY environment variable is not set")
+    logger.error("Error: ELEVENLABS_API_KEY environment variable is not set")
     sys.exit(1)
 
 if not agent_id:
-    print("Error: AGENT_ID environment variable is not set")
+    logger.error("Error: AGENT_ID environment variable is not set")
     sys.exit(1)
 
 client = ElevenLabs(api_key=api_key)
@@ -53,9 +61,9 @@ def prepare_conversation(
         requires_auth=bool(api_key),
         audio_interface=DefaultAudioInterface(),
         config=config,
-        callback_agent_response=lambda response: print(f"Agent: {response}"),
-        callback_agent_response_correction=lambda original, corrected: print(f"Agent corrected: {corrected}"),
-        callback_user_transcript=lambda transcript: print(f"User: {transcript}"),
+        callback_agent_response=lambda response: logger.log(f"Agent: {response}"),
+        callback_agent_response_correction=lambda original, corrected: logger.log(f"Agent corrected: {corrected}"),
+        callback_user_transcript=lambda transcript: logger.log(f"User: {transcript}"),
     )
 
 
@@ -71,11 +79,11 @@ def establish_voice_conversation(conversation: Conversation) -> str | None:
         conversation.start_session()
         signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
         conversation_id = conversation.wait_for_session_end()
-        print(f"Conversation ID: {conversation_id}")
+        logger.info(f"Conversation ID: {conversation_id}")
         return conversation_id
 
     except Exception as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
         conversation.end_session()
         return None
 
@@ -96,5 +104,5 @@ def check_patient_consent_to_reschedule(conversation_id: str) -> bool:
         .get("consent_to_change_the_date", {})
         .get("value", None)
     )
-    print(f"Patient agreed: {result}")
+    logger.info(f"Patient agreed: {result}")
     return result
