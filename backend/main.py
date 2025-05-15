@@ -1,5 +1,6 @@
 import json
 import logging.config
+import math
 import random
 import traceback
 from pathlib import Path
@@ -7,7 +8,7 @@ from typing import List
 
 from db_operations import get_session
 from fastapi import FastAPI, Query
-from models import Bed, BedAssignment, ListOfTables, NoShow, Patient, PatientQueue
+from models import *
 
 logger = logging.getLogger("hospital_logger")
 config_file = Path("logger_config.json")
@@ -18,6 +19,8 @@ logging.config.dictConfig(config)
 app = FastAPI()
 day_for_simulation = 1
 last_change = 1
+session = get_session()
+random.seed(43)
 
 
 @app.get("/get-current-day")
@@ -37,8 +40,74 @@ def update_day(delta: int = Query(...)):
     return {"day": day_for_simulation}
 
 
+def assign_bed_to_patient(bed_id: int, patient_id: int, days: int, log: bool):
+    global session
+    assignment = BedAssignment(bed_id=bed_id, patient_id=patient_id, days_of_stay=days)
+    session.add(assignment)
+    if log:
+        logger.info(f"Assigned bed {bed_id} to patient {patient_id} for {days} days")
+
+
+def delete_patient_by_id_from_queue(patient_id: int):
+    global session
+    entry = session.query(PatientQueue).filter_by(patient_id=patient_id).order_by(PatientQueue.queue_id).first()
+    if entry:
+        session.delete(entry)
+        queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
+        for i, entry in enumerate(queue):
+            entry.queue_id = i + 1
+
+
+def get_first_free_bed() -> int:
+    global session
+    return session.query(BedAssignment).filter_by(patient_id=0).first().bed_id
+
+
+@app.get("/get-bed-assignments-and-queue", response_model=BedAssignmentsAndQueue)
+def get_bed_assignments_and_queue():
+    global session
+    bed_assignments = []
+    for bed in (
+        session.query(Bed)
+        .join(BedAssignment, Bed.bed_id == BedAssignment.bed_id, isouter=True)
+        .join(Patient, BedAssignment.patient_id == Patient.patient_id, isouter=True)
+        .order_by(Bed.bed_id)
+        .all()
+    ):
+        ba = session.query(BedAssignment).filter_by(bed_id=bed.bed_id).first()
+        patient = ba.patient if ba else None
+
+        patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Unoccupied"
+        sickness = patient.sickness if patient else "Unoccupied"
+        days_of_stay = ba.days_of_stay if ba else 0
+
+        bed_assignments.append(
+            {
+                "bed_id": bed.bed_id,
+                "patient_id": ba.patient_id if ba else 0,
+                "patient_name": patient_name,
+                "sickness": sickness,
+                "days_of_stay": days_of_stay,
+            }
+        )
+
+    queue_data = []
+    for entry in session.query(PatientQueue).order_by(PatientQueue.queue_id).all():
+        patient = session.query(Patient).filter_by(patient_id=entry.patient_id).first()
+        queue_data.append(
+            {
+                "place_in_queue": entry.queue_id,
+                "patient_id": patient.patient_id,
+                "patient_name": f"{patient.first_name} {patient.last_name}",
+            }
+        )
+    return BedAssignmentsAndQueue(BedAssignment=bed_assignments, PatientQueue=queue_data)
+
+
 @app.get("/get-tables", response_model=ListOfTables)
 def get_tables():
+    global session
+
     def decrement_days_of_stay():
         for ba in session.query(BedAssignment).all():
             ba.days_of_stay -= 1
@@ -59,31 +128,14 @@ def get_tables():
     def delete_patients_to_be_released():
         session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0).delete(synchronize_session="auto")
 
-    def assign_bed_to_patient(bed_id: int, patient_id: int, days: int, log: bool):
-        assignment = BedAssignment(bed_id=bed_id, patient_id=patient_id, days_of_stay=days)
-        session.add(assignment)
-        if log:
-            logger.info(f"Assigned bed {bed_id} to patient {patient_id} for {days} days")
-
     def check_if_patient_has_bed(patient_id: int) -> bool:
         return session.query(BedAssignment).filter_by(patient_id=patient_id).first() is not None
-
-    def delete_patient_by_id_from_queue(patient_id: int):
-        entry = session.query(PatientQueue).filter_by(patient_id=patient_id).order_by(PatientQueue.queue_id).first()
-        if entry:
-            session.delete(entry)
-            queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
-            for i, entry in enumerate(queue):
-                entry.queue_id = i + 1
 
     def get_patient_name_by_id(patient_id: int) -> str:
         patient = session.query(Patient).filter_by(patient_id=patient_id).first()
         return f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
 
     try:
-        random.seed(43)
-        session = get_session()
-
         if last_change == 1:
             logger.info(f"Current simulation day: {day_for_simulation}")
         else:
@@ -106,11 +158,9 @@ def get_tables():
             bed_iterator = 0
 
             for i, entry in enumerate(queue):
-                if i + 1 > number_of_patients_to_release:
+                if i + 1 > number_of_patients_to_release or bed_iterator >= len(bed_ids):
                     break
                 patient_id = entry.patient_id
-                if bed_iterator >= len(bed_ids):
-                    break
                 will_come = random.choice([True] * 4 + [False])
                 if not will_come:
                     delete_patient_by_id_from_queue(patient_id)
@@ -128,53 +178,49 @@ def get_tables():
                     delete_patient_by_id_from_queue(patient_id)
                     bed_iterator += 1
 
-        bed_assignments = []
-        for bed in (
-            session.query(Bed)
-            .join(BedAssignment, Bed.bed_id == BedAssignment.bed_id, isouter=True)
-            .join(Patient, BedAssignment.patient_id == Patient.patient_id, isouter=True)
-            .order_by(Bed.bed_id)
-            .all()
-        ):
-            ba = session.query(BedAssignment).filter_by(bed_id=bed.bed_id).first()
-            patient = ba.patient if ba else None
-
-            patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Unoccupied"
-            sickness = patient.sickness if patient else "Unoccupied"
-            pesel = patient.pesel if patient else "Unoccupied"
-            days_of_stay = ba.days_of_stay if ba else 0
-
-            bed_assignments.append(
-                {
-                    "bed_id": bed.bed_id,
-                    "patient_id": ba.patient_id if ba else 0,
-                    "patient_name": patient_name,
-                    "sickness": sickness,
-                    "PESEL": pesel,
-                    "days_of_stay": days_of_stay,
-                }
-            )
-
-        queue_data = []
-        for entry in session.query(PatientQueue).order_by(PatientQueue.queue_id).all():
-            patient = session.query(Patient).filter_by(patient_id=entry.patient_id).first()
-            queue_data.append(
-                {
-                    "place_in_queue": entry.queue_id,
-                    "patient_id": patient.patient_id,
-                    "patient_name": f"{patient.first_name} {patient.last_name}",
-                    "PESEL": f"...{patient.pesel[-3:]}",
-                }
-            )
-
-        session.rollback()
-        session.close()
+        bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
         return ListOfTables(
-            BedAssignment=bed_assignments, PatientQueue=queue_data, NoShows=[n.model_dump() for n in no_shows_list]
+            BedAssignment=bed_assignments_and_queue.BedAssignment,
+            PatientQueue=bed_assignments_and_queue.PatientQueue,
+            NoShows=[n.model_dump() for n in no_shows_list],
         )
 
     except Exception as e:
         error_message = f"Error occurred: {str(e)}\n{traceback.format_exc()}"
         logger.error(error_message)
         return {"error": "Server Error", "message": error_message}
+
+
+@app.get("/create-voice-call", response_model=BedAssignmentsAndQueue)
+def create_voice_call(patient_id: int) -> BedAssignmentsAndQueue:
+    global session, day_for_simulation
+    patient = session.query(Patient).filter_by(patient_id=patient_id).first()
+    queue_id = session.query(PatientQueue).filter_by(patient_id=patient_id).first().queue_id
+
+    logger.info(f"A call for patient {patient.first_name} was created.")
+    old_day, new_day = day_for_simulation + math.ceil(queue_id // random.randint(2, 4)), day_for_simulation
+    logger.info(f"current day of visit: {old_day}, new day: {new_day}")
+
+    # consent = handle_patient_rescheduling(patient.first_name, patient.last_name, patient.sickness, old_day, new_day)
+    consent = True
+    if consent:
+        delete_patient_by_id_from_queue(patient.patient_id)
+
+        bed_id: int = get_first_free_bed()
+        days = random.randint(1, 7)
+        assign_bed_to_patient(bed_id, patient.patient_id, days, True)
+
+    bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
+
+    return bed_assignments_and_queue
+
+
+@app.post("/rollback-session", response_model=dict[str, int])
+def rollback_session():  # in front-end: call at the end of the day (or before)
+    global session
+    session.rollback()
+    return {"status": 200}
+
+
+session.close()
