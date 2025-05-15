@@ -30,6 +30,11 @@ class ListOfTables(BaseModel):
     NoShows: list[NoShow]
 
 
+class BedAssignmentsAndQueue(BaseModel):
+    BedAssignment: list[BedAssignmentResponse]
+    PatientQueue: list[PatientQueueResponse]
+
+
 class Patient(Base):
     __tablename__ = "patients"
     patient_id = Column(Integer, primary_key=True)
