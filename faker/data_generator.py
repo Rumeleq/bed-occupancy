@@ -1,3 +1,5 @@
+import datetime
+import random
 from enum import Enum
 
 from pydantic import BaseModel
@@ -16,6 +18,7 @@ class Patient(BaseModel):
     urgency: Urgency
     contact_phone: str
     sickness: str
+    pesel: str
 
 
 Faker.seed(42)
@@ -73,11 +76,29 @@ sicknesses = [
     "Przerost prostaty",
 ]
 
+fake = Faker("pl_PL")
+
+
+def generate_random_date_between_ages(min_age, max_age):
+    today = datetime.date.today()
+    earliest_date = datetime.date(today.year - max_age, today.month, today.day)
+    latest_date = datetime.date(today.year - min_age, today.month, today.day)
+
+    earliest_days = earliest_date.toordinal()
+    latest_days = latest_date.toordinal()
+
+    return datetime.date.fromordinal(random.randint(earliest_days, latest_days))
+
 
 def generate_fake_patient_data() -> Patient:
-    fake = Faker("pl_PL")
-    name = fake.first_name()
-    surname = fake.last_name()
+    if random.randint(1, 2) == 1:
+        name = fake.first_name_female()
+        surname = fake.last_name_female()
+        pesel = fake.unique.pesel(date_of_birth=generate_random_date_between_ages(2, 100), sex="F")
+    else:
+        name = fake.first_name_male()
+        surname = fake.last_name_male()
+        pesel = fake.unique.pesel(date_of_birth=generate_random_date_between_ages(2, 100), sex="M")
     random_urgency = fake.enum(Urgency)
     phone_number = fake.phone_number().replace(" ", "").replace("+48", "")
     random_sickness = fake.random_element(sicknesses)
@@ -87,4 +108,5 @@ def generate_fake_patient_data() -> Patient:
         urgency=random_urgency,
         contact_phone=phone_number,
         sickness=random_sickness,
+        pesel=pesel,
     )

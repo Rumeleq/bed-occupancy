@@ -92,7 +92,7 @@ def add_patient_assignment_to_bed(session):
 
 
 def main():
-    random.seed(43)
+    random.seed(44)
     session = SessionLocal()
     try:
         if not check_data_existence(session):

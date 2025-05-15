@@ -99,7 +99,7 @@ def get_tables():
             number_of_patients_to_release = print_patients_to_be_released(log=should_log)
             delete_patients_to_be_released()
 
-            assigned_beds = session.query(BedAssignment.bed_id).subquery()
+            assigned_beds = session.query(BedAssignment.bed_id).scalar_subquery()
             bed_ids = [b.bed_id for b in session.query(Bed).filter(~Bed.bed_id.in_(assigned_beds)).all()]
 
             queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
@@ -141,6 +141,7 @@ def get_tables():
 
             patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Unoccupied"
             sickness = patient.sickness if patient else "Unoccupied"
+            pesel = patient.pesel if patient else "Unoccupied"
             days_of_stay = ba.days_of_stay if ba else 0
 
             bed_assignments.append(
@@ -149,6 +150,7 @@ def get_tables():
                     "patient_id": ba.patient_id if ba else 0,
                     "patient_name": patient_name,
                     "sickness": sickness,
+                    "PESEL": pesel,
                     "days_of_stay": days_of_stay,
                 }
             )
@@ -161,6 +163,7 @@ def get_tables():
                     "place_in_queue": entry.queue_id,
                     "patient_id": patient.patient_id,
                     "patient_name": f"{patient.first_name} {patient.last_name}",
+                    "PESEL": f"...{patient.pesel[-3:]}",
                 }
             )
 
