@@ -71,9 +71,30 @@ def establish_voice_conversation(conversation: Conversation) -> str | None:
         conversation.start_session()
         signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
         conversation_id = conversation.wait_for_session_end()
+        print(f"Conversation ID: {conversation_id}")
         return conversation_id
 
     except Exception as e:
         print(f"Error: {e}")
         conversation.end_session()
         return None
+
+
+def check_patient_consent_to_reschedule(conversation_id: str) -> bool:
+    """
+    Checks if the patient has given consent to reschedule their appointment
+    based on the analysis of the conversation data.
+
+    :param conversation_id: The ID of the conversation to analyze.
+    :return: A boolean indicating whether the patient agreed to reschedule.
+    """
+    conversation_data = client.conversational_ai.get_conversation(conversation_id=conversation_id)
+
+    result: bool = (
+        json.loads(conversation_data.analysis.json())
+        .get("data_collection_results", {})
+        .get("consent_to_change_the_date", {})
+        .get("value", None)
+    )
+    print(f"Patient agreed: {result}")
+    return result
