@@ -56,20 +56,22 @@ def agent_call(name: str, surname: str, pesel: str, sickness: str, old_day: int,
     )
     if st.session_state.consent:
         response = requests.get("http://backend:8000/move-patient-to-bed-assignment")
-        global queue_df, bed_df
 
-        if not bed_df.empty:
-            # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
-            #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
-            st.dataframe(bed_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No bed assignments found.")
-
-        st.sidebar.subheader("Patients in queue")
-        if not queue_df.empty:
-            st.sidebar.dataframe(queue_df, use_container_width=True, hide_index=True)
-        else:
-            st.sidebar.info("No patients found in the queue.")
+        reload_page()
+        # global queue_df, bed_df
+        #
+        # if not bed_df.empty:
+        #     # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
+        #     #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
+        #     st.dataframe(bed_df, use_container_width=True, hide_index=True)
+        # else:
+        #     st.info("No bed assignments found.")
+        #
+        # st.sidebar.subheader("Patients in queue")
+        # if not queue_df.empty:
+        #     st.sidebar.dataframe(queue_df, use_container_width=True, hide_index=True)
+        # else:
+        #     st.sidebar.info("No patients found in the queue.")
 
 
 def get_list_of_tables() -> Optional[Dict]:
@@ -104,55 +106,62 @@ def simulate_previous_day() -> None:
         st.session_state.error_message = f"Failed to connect to the server: {e}"
 
 
-tables = get_list_of_tables()
-bed_df = pd.DataFrame(tables["BedAssignment"])
-queue_df = pd.DataFrame(tables["PatientQueue"])
-no_shows_df = pd.DataFrame(tables["NoShows"])
+def reload_page():
+    st.rerun()
 
-if not bed_df.empty:
-    # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
-    #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
-    st.dataframe(bed_df, use_container_width=True, hide_index=True)
-else:
-    st.info("No bed assignments found.")
+    tables = get_list_of_tables()
+    bed_df = pd.DataFrame(tables["BedAssignment"])
+    queue_df = pd.DataFrame(tables["PatientQueue"])
+    no_shows_df = pd.DataFrame(tables["NoShows"])
 
-if len(bed_df[bed_df["patient_id"] == 0]) > 0:
-    st.session_state.queue_id = 1
-    st.session_state.patient_id = queue_df["patient_id"][st.session_state.queue_id]
-    name = queue_df["patient_name"][st.session_state.queue_id].split()[0]
-    surname = queue_df["patient_name"][st.session_state.queue_id].split()[1]
-    pesel = queue_df["PESEL"][st.session_state.queue_id][-3:]
-    response = requests.get("http://backend:8000/get-patient-data", params={"patient_id": st.session_state.patient_id})
-    st.session_state.consent = False
-    st.sidebar.button(
-        "Call patient 📞",
-        on_click=lambda: agent_call(
-            name=name,
-            surname=surname,
-            pesel=pesel,
-            sickness=response.json()["sickness"],
-            old_day=response.json()["old_day"],
-            new_day=response.json()["new_day"],
-        ),
-    )
+    if not bed_df.empty:
+        # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
+        #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
+        st.dataframe(bed_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("No bed assignments found.")
 
-st.sidebar.subheader("Patients in queue")
-if not queue_df.empty:
-    st.sidebar.dataframe(queue_df, use_container_width=True, hide_index=True)
-else:
-    st.sidebar.info("No patients found in the queue.")
+    if len(bed_df[bed_df["patient_id"] == 0]) > 0:
+        st.session_state.queue_id = 1
+        st.session_state.patient_id = queue_df["patient_id"][st.session_state.queue_id]
+        name = queue_df["patient_name"][st.session_state.queue_id].split()[0]
+        surname = queue_df["patient_name"][st.session_state.queue_id].split()[1]
+        pesel = queue_df["PESEL"][st.session_state.queue_id][-3:]
+        response = requests.get("http://backend:8000/get-patient-data", params={"patient_id": st.session_state.patient_id})
+        st.session_state.consent = False
+        st.sidebar.button(
+            "Call patient 📞",
+            on_click=lambda: agent_call(
+                name=name,
+                surname=surname,
+                pesel=pesel,
+                sickness=response.json()["sickness"],
+                old_day=response.json()["old_day"],
+                new_day=response.json()["new_day"],
+            ),
+        )
 
-st.sidebar.subheader("Patients absent on a given day")
-if not no_shows_df.empty:
-    st.sidebar.dataframe(no_shows_df, use_container_width=True, hide_index=True)
-else:
-    st.sidebar.info("No no-shows found.")
+    st.sidebar.subheader("Patients in queue")
+    if not queue_df.empty:
+        st.sidebar.dataframe(queue_df, use_container_width=True, hide_index=True)
+    else:
+        st.sidebar.info("No patients found in the queue.")
 
-if st.session_state.day_for_simulation < 20:
-    st.button("➡️ Simulate Next Day", on_click=simulate_next_day)
+    st.sidebar.subheader("Patients absent on a given day")
+    if not no_shows_df.empty:
+        st.sidebar.dataframe(no_shows_df, use_container_width=True, hide_index=True)
+    else:
+        st.sidebar.info("No no-shows found.")
 
-if st.session_state.day_for_simulation > 1:
-    st.button("⬅️ Simulate Previous Day", on_click=simulate_previous_day)
+    if st.session_state.day_for_simulation < 20:
+        st.button("➡️ Simulate Next Day", on_click=simulate_next_day)
 
-if "error_message" in st.session_state and st.session_state.error_message:
-    st.error(st.session_state.error_message)
+    if st.session_state.day_for_simulation > 1:
+        st.button("⬅️ Simulate Previous Day", on_click=simulate_previous_day)
+
+    if "error_message" in st.session_state and st.session_state.error_message:
+        st.error(st.session_state.error_message)
+
+
+if __name__ == "__main__":
+    reload_page()
