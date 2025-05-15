@@ -46,10 +46,18 @@ def simulate_previous_day() -> None:
 def call_patient(patient_id: int) -> None:
     try:
         response = requests.get("http://backend:8000/create-voice-call", params={"patient_id": patient_id})
+        st.session_state.queue_id += 1
         result = response.json()
         bed_df = pd.DataFrame(result["BedAssignment"])
         queue_df = pd.DataFrame(result["PatientQueue"])
         global no_shows_df
+
+        if not bed_df.empty:
+            # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
+            #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
+            st.dataframe(bed_df, use_container_width=True)
+        else:
+            st.info("No bed assignments found.")
 
         st.sidebar.subheader("Patients in queue")
         if not queue_df.empty:
@@ -89,8 +97,10 @@ else:
     st.info("No bed assignments found.")
 
 
-if len(queue_df[queue_df["patient_id"] == 0]) > 0:
-    st.sidebar.button("Call patient 📞")
+if len(bed_df[bed_df["patient_id"] == 0]) > 0:
+    st.session_state.queue_id = 1
+    st.session_state.patient_id = queue_df["patient_id"][st.session_state.queue_id]
+    st.sidebar.button("Call patient 📞", on_click=lambda: call_patient(st.session_state.patient_id))
 
 
 st.sidebar.subheader("Patients in queue")
