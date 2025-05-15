@@ -23,28 +23,49 @@ if not agent_id:
 
 client = ElevenLabs(api_key=api_key)
 
-config = ConversationInitiationData(
-    dynamic_variables={
-        "patient_name": "Jan",
-        "patient_surname": "Topolewski",
-        "patient_sickness": "zapalenie kolana",
-        "current_visit_day": 10,
-        "suggested_appointment_day": 5,
-    }
+
+def prepare_conversation(
+    patient_name: str, patient_surname: str, patient_sickness: str, current_visit_day: int, suggested_appointment_day: int
+) -> Conversation:
+    """
+    Prepares a conversation session with dynamic variables for a patient.
+
+    :param patient_name: The first name of the patient.
+    :param patient_surname: The last name of the patient.
+    :param patient_sickness: The sickness or condition of the patient.
+    :param current_visit_day: The current day of the patient's visit.
+    :param suggested_appointment_day: The suggested day for the next appointment.
+    :return: A `Conversation` object configured with the provided patient details.
+    """
+    config = ConversationInitiationData(
+        dynamic_variables={
+            "patient_name": patient_name,
+            "patient_surname": patient_surname,
+            "patient_sickness": patient_sickness,
+            "current_visit_day": current_visit_day,
+            "suggested_appointment_day": suggested_appointment_day,
+        }
+    )
+
+    return Conversation(
+        client,
+        agent_id,
+        requires_auth=bool(api_key),
+        audio_interface=DefaultAudioInterface(),
+        config=config,
+        callback_agent_response=lambda response: print(f"Agent: {response}"),
+        callback_agent_response_correction=lambda original, corrected: print(f"Agent: {original} -> {corrected}"),
+        callback_user_transcript=lambda transcript: print(f"User: {transcript}"),
+    )
+
+
+conversation = prepare_conversation(
+    patient_name="Jan",
+    patient_surname="Topolewski",
+    patient_sickness="zapalenie kolana",
+    current_visit_day=10,
+    suggested_appointment_day=5,
 )
-
-conversation = Conversation(
-    client,
-    agent_id,
-    requires_auth=bool(api_key),
-    audio_interface=DefaultAudioInterface(),
-    config=config,
-    callback_agent_response=lambda response: print(f"Agent: {response}"),
-    callback_agent_response_correction=lambda original, corrected: print(f"Agent: {original} -> {corrected}"),
-    callback_user_transcript=lambda transcript: print(f"User: {transcript}"),
-)
-
-
 try:
     conversation.start_session()
     signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
