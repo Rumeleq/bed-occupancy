@@ -21,7 +21,7 @@ day_for_simulation = 1
 last_change = 1
 session = get_session()
 random.seed(43)
-patients_consent_dictionary: dict[int, list[int]] = {}
+patients_consent_dictionary: dict[int, list[dict]] = {}
 
 
 @app.get("/get-current-day")
@@ -179,6 +179,10 @@ def get_tables():
                     delete_patient_by_id_from_queue(patient_id)
                     bed_iterator += 1
 
+            patients_to_move = patients_consent_dictionary[day_for_simulation]
+            for patient in patients_to_move:
+                assign_bed_to_patient(patient["bed_id"], patient["patient_id"], days, should_log)
+
         bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
         return ListOfTables(
@@ -211,9 +215,9 @@ def move_patient_to_bed_assignment(patient_id: int) -> BedAssignmentsAndQueue:
     assign_bed_to_patient(bed_id, patient_id, days, True)
 
     if day_for_simulation in patients_consent_dictionary:
-        patients_consent_dictionary[day_for_simulation].append(patient_id)
+        patients_consent_dictionary[day_for_simulation].append({"patient_id": patient_id, "days": days, "bed_id": bed_id})
     else:
-        patients_consent_dictionary[day_for_simulation] = [patient_id]
+        patients_consent_dictionary[day_for_simulation] = [{"patient_id": patient_id, "days": days, "bed_id": bed_id}]
 
     bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
