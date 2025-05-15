@@ -5,8 +5,7 @@ pandas==2.2.3
 fastapi==0.115.12
 requests==2.32.3
 fastapi[standard]
-
 psycopg2==2.9.10
 python-dotenv==1.0.1
-
 SQLAlchemy==2.0.37
+elevenlabs~=1.58.1
