@@ -68,6 +68,15 @@ def prepare_conversation(
 
 
 def establish_voice_conversation(conversation: Conversation) -> str | None:
+    """
+    Establishes a voice conversation session with a patient and handles its lifecycle.
+
+    Starts the session, waits for it to end, and captures the conversation ID.
+    Handles interruptions (e.g., SIGINT) and ensures the session is properly terminated in case of errors.
+
+    :param conversation: The `Conversation` object representing the session.
+    :return: The conversation ID as a string if successful, or `None` if an error occurs.
+    """
     try:
         conversation.start_session()
         signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
