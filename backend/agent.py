@@ -68,13 +68,6 @@ def prepare_conversation(
 
 
 def establish_voice_conversation(conversation: Conversation) -> str | None:
-    # conversation = prepare_conversation(
-    #     patient_name="Jan",
-    #     patient_surname="Topolewski",
-    #     patient_sickness="zapalenie kolana",
-    #     current_visit_day=10,
-    #     suggested_appointment_day=5
-    # )
     try:
         conversation.start_session()
         signal.signal(signal.SIGINT, lambda sig, frame: conversation.end_session())
