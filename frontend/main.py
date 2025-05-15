@@ -3,12 +3,36 @@ from typing import Dict, Optional
 import pandas as pd
 import requests
 import streamlit as st
+from agent import *
 
 if "day_for_simulation" not in st.session_state:
     st.session_state.day_for_simulation = requests.get("http://backend:8000/get-current-day").json()["day"]
 st.set_page_config(page_title="Hospital bed management", page_icon="🏥")
 st.title("Bed Assignments")
 st.header(f"Day {st.session_state.day_for_simulation}")
+
+
+def handle_patient_rescheduling(name: str, surname: str, sickness: str, old_day: int, new_day: int) -> bool:
+    """
+    Handles the process of rescheduling a patient's appointment by initiating a voice conversation
+    with the patient and analyzing their consent.
+
+    :param name: The first name of the patient.
+    :param surname: The last name of the patient.
+    :param sickness: The sickness or condition of the patient.
+    :param old_day: The current day of the patient's visit.
+    :param new_day: The suggested day for the new appointment.
+    :return: A boolean indicating whether the patient consented to the rescheduling.
+    """
+    conversation = prepare_conversation(
+        patient_name=name,
+        patient_surname=surname,
+        patient_sickness=sickness,
+        current_visit_day=old_day,
+        suggested_appointment_day=new_day,
+    )
+    conversation_id = establish_voice_conversation(conversation)
+    return check_patient_consent_to_reschedule(conversation_id)
 
 
 def get_list_of_tables() -> Optional[Dict]:

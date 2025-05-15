@@ -16,7 +16,7 @@ agent_id = os.getenv("AGENT_ID")
 api_key = os.getenv("ELEVENLABS_API_KEY")
 
 logger = logging.getLogger("hospital_logger")
-config_file = Path("logger_config.json")
+config_file = Path("../backend/logger_config.json")
 with open(config_file) as f:
     config = json.load(f)
 logging.config.dictConfig(config)
