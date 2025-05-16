@@ -109,7 +109,7 @@ def get_bed_assignments_and_queue():
 
 
 @app.get("/get-tables", response_model=ListOfTables)
-def get_tables():
+def get_tables(only_patients_from_call: bool = False):
     global session
 
     def decrement_days_of_stay():
@@ -147,45 +147,49 @@ def get_tables():
 
         no_shows_list: List[NoShow] = []
 
-        for iteration in range(day_for_simulation - 1):
-            should_log = iteration == day_for_simulation - 2 and last_change == 1
-            should_give_no_shows = iteration == day_for_simulation - 2
+        for iteration in range(day_for_simulation - 1):  # TODO: zrobić tak, żeby nie cofać dni
+            if (
+                not only_patients_from_call or not iteration == day_for_simulation - 2
+            ):  # przy iteracji z tego dnia, jeśli chcemy tylko pacjentów z calla, to nie wykona sie reszta kolejki
+                should_log = iteration == day_for_simulation - 2 and last_change == 1
+                should_give_no_shows = iteration == day_for_simulation - 2
 
-            decrement_days_of_stay()
-            number_of_patients_to_release = print_patients_to_be_released(log=should_log)
-            delete_patients_to_be_released()
+                decrement_days_of_stay()
+                number_of_patients_to_release = print_patients_to_be_released(log=should_log)
+                delete_patients_to_be_released()
 
-            assigned_beds = session.query(BedAssignment.bed_id).scalar_subquery()
-            bed_ids = [b.bed_id for b in session.query(Bed).filter(~Bed.bed_id.in_(assigned_beds)).all()]
+                assigned_beds = session.query(BedAssignment.bed_id).scalar_subquery()
+                bed_ids = [b.bed_id for b in session.query(Bed).filter(~Bed.bed_id.in_(assigned_beds)).all()]
 
-            queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
-            bed_iterator = 0
+                queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
+                bed_iterator = 0
 
-            for i, entry in enumerate(queue):
-                if i + 1 > number_of_patients_to_release or bed_iterator >= len(bed_ids):
-                    break
-                patient_id = entry.patient_id
-                will_come = random.choice([True] * 4 + [False])
-                if not will_come:
-                    delete_patient_by_id_from_queue(patient_id)
-                    no_show = NoShow(patient_id=patient_id, patient_name=get_patient_name_by_id(patient_id))
-                    if should_give_no_shows:
-                        no_shows_list.append(no_show)
-                    if should_log:
-                        logger.info(f"No-show: {no_show.patient_name}")
-                elif check_if_patient_has_bed(patient_id):
-                    if should_log:
-                        logger.info(f"Patient {patient_id} already has a bed")
-                else:
-                    days = random.randint(1, 7)
-                    assign_bed_to_patient(bed_ids[bed_iterator], patient_id, days, should_log)
-                    delete_patient_by_id_from_queue(patient_id)
-                    bed_iterator += 1
+                for i, entry in enumerate(queue):
+                    if i + 1 > number_of_patients_to_release or bed_iterator >= len(bed_ids):
+                        break
+                    patient_id = entry.patient_id
+                    will_come = random.choice([True] * 4 + [False])
+                    if not will_come:
+                        delete_patient_by_id_from_queue(patient_id)
+                        no_show = NoShow(patient_id=patient_id, patient_name=get_patient_name_by_id(patient_id))
+                        if should_give_no_shows:
+                            no_shows_list.append(no_show)
+                        if should_log:
+                            logger.info(f"No-show: {no_show.patient_name}")
+                    elif check_if_patient_has_bed(patient_id):
+                        if should_log:
+                            logger.info(f"Patient {patient_id} already has a bed")
+                    else:
+                        days = random.randint(1, 7)
+                        assign_bed_to_patient(bed_ids[bed_iterator], patient_id, days, should_log)
+                        delete_patient_by_id_from_queue(patient_id)
+                        bed_iterator += 1
 
+            # TODO: upewnić sie czy to na pewno tu, czy za forem
             if day_for_simulation in patients_consent_dictionary:
                 patients_to_move = patients_consent_dictionary[day_for_simulation]
                 for patient in patients_to_move:
-                    assign_bed_to_patient(patient["bed_id"], patient["patient_id"], days, should_log)
+                    assign_bed_to_patient(patient["bed_id"], patient["patient_id"], patient["days"], True)
 
         bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
@@ -216,7 +220,7 @@ def move_patient_to_bed_assignment(patient_id: int) -> BedAssignmentsAndQueue:
 
     bed_id: int = get_first_free_bed()
     days = random.randint(1, 7)
-    assign_bed_to_patient(bed_id, patient_id, days, True)
+    # assign_bed_to_patient(bed_id, patient_id, days, True) # assign bed robimy tylko w get_tables
 
     if day_for_simulation in patients_consent_dictionary:
         patients_consent_dictionary[day_for_simulation].append({"patient_id": patient_id, "days": days, "bed_id": bed_id})
