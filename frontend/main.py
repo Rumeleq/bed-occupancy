@@ -7,6 +7,7 @@ from agent import *
 
 if "day_for_simulation" not in st.session_state:
     st.session_state.day_for_simulation = requests.get("http://backend:8000/get-current-day").json()["day"]
+    st.session_state.only_patients_from_call = False
 st.set_page_config(page_title="Hospital bed management", page_icon="🏥")
 st.title("Bed Assignments")
 st.header(f"Day {st.session_state.day_for_simulation}")
@@ -51,14 +52,18 @@ def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: s
     return True
 
 
-def agent_call(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int):
+def agent_call(patient_id: int, name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int):
     st.session_state.consent = handle_patient_rescheduling(
         name=name, surname=surname, pesel=pesel, sickness=sickness, old_day=old_day, new_day=new_day
     )
     if st.session_state.consent:
-        response = requests.get("http://backend:8000/move-patient-to-bed-assignment")
-
-        reload_page(True)
+        response = requests.get("http://backend:8000/move-patient-to-bed-assignment", params={"patient_id": patient_id})
+        st.session_state.only_patients_from_call = True
+        global placeholder
+        placeholder.empty()
+        with placeholder.container():
+            st.write("loading ... ")
+        # reload_page()
         # global queue_df, bed_df
         #
         # if not bed_df.empty:
@@ -90,6 +95,7 @@ def get_list_of_tables(only_patients_from_call: bool = False) -> Optional[Dict]:
 
 def simulate_next_day() -> None:
     try:
+        st.session_state.only_patients_from_call = False
         requests.post("http://backend:8000/rollback-session")
         response = requests.get("http://backend:8000/update-day", params={"delta": 1})
         st.session_state.day_for_simulation = response.json()["day"]
@@ -110,11 +116,11 @@ def simulate_previous_day() -> None:
 
 
 # TODO: zrobić jakiś mechanizm lub funkcję/ cokolwiek co reprezentowałoby 1 dzień symulacji
-def reload_page(only_patients_from_call: bool = False) -> None:
+def reload_page() -> None:
     global placeholder
     placeholder = st.empty()
     with placeholder.container():
-        tables = get_list_of_tables(only_patients_from_call)
+        tables = get_list_of_tables(st.session_state.only_patients_from_call)
         bed_df = pd.DataFrame(tables["BedAssignment"])
         queue_df = pd.DataFrame(tables["PatientQueue"])
         no_shows_df = pd.DataFrame(tables["NoShows"])
@@ -135,8 +141,9 @@ def reload_page(only_patients_from_call: bool = False) -> None:
             response = requests.get("http://backend:8000/get-patient-data", params={"patient_id": st.session_state.patient_id})
             st.session_state.consent = False
             st.sidebar.button(
-                f"Call patient {name} {surname} 📞",
+                f"Call patient {st.session_state.patient_id} {name} {surname} 📞",
                 on_click=lambda: agent_call(
+                    patient_id=st.session_state.patient_id,
                     name=name,
                     surname=surname,
                     pesel=pesel,
@@ -169,4 +176,4 @@ def reload_page(only_patients_from_call: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    reload_page(False)
+    reload_page()

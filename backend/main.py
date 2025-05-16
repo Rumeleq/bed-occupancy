@@ -20,7 +20,7 @@ app = FastAPI()
 day_for_simulation = 1
 last_change = 1
 session = get_session()
-random.seed(44)
+random.seed(43)
 patients_consent_dictionary: dict[int, list[dict]] = {}
 
 
@@ -59,11 +59,47 @@ def delete_patient_by_id_from_queue(patient_id: int):
             entry.queue_id = i + 1
 
 
-def get_first_free_bed() -> int:
+def get_first_free_bed() -> int | None:
     global session
-    result = session.query(BedAssignment).filter_by(patient_id=0).first().bed_id
-    print("first free bed for patient: ", result)
-    return result
+
+    bed_assignments = []
+    for bed in (
+        session.query(Bed)
+        .join(BedAssignment, Bed.bed_id == BedAssignment.bed_id, isouter=True)
+        .join(Patient, BedAssignment.patient_id == Patient.patient_id, isouter=True)
+        .order_by(Bed.bed_id)
+        .all()
+    ):
+        ba = session.query(BedAssignment).filter_by(bed_id=bed.bed_id).first()
+        if not ba:
+            return bed.bed_id
+    return None
+
+    #     patient = ba.patient if ba else None
+    #
+    #     patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Unoccupied"
+    #     sickness = patient.sickness if patient else "Unoccupied"
+    #     pesel = patient.pesel if patient else "Unoccupied"
+    #     days_of_stay = ba.days_of_stay if ba else 0
+    #
+    #     bed_assignments.append(
+    #         {
+    #             "bed_id": bed.bed_id,
+    #             "patient_id": ba.patient_id if ba else 0,
+    #             "patient_name": patient_name,
+    #             "sickness": sickness,
+    #             "PESEL": pesel,
+    #             "days_of_stay": days_of_stay,
+    #         }
+    #     )
+    #
+    #
+    # print(session.query(BedAssignment))
+    # result = session.query(BedAssignment).filter_by(patient_id=None).first()
+    # if result is not None:
+    #     print("first free bed for patient: ", result.bed_id)
+    #     return result.bed_id
+    # else: return None
 
 
 @app.get("/get-bed-assignments-and-queue", response_model=BedAssignmentsAndQueue)
@@ -151,7 +187,7 @@ def get_tables(only_patients_from_call: bool = False):
 
         for iteration in range(day_for_simulation - 1):  # TODO: zrobić tak, żeby nie cofać dni
             if (
-                not only_patients_from_call or not iteration == day_for_simulation - 2
+                (not only_patients_from_call) or iteration < day_for_simulation - 2
             ):  # przy iteracji z tego dnia, jeśli chcemy tylko pacjentów z calla, to nie wykona sie reszta kolejki
                 should_log = iteration == day_for_simulation - 2 and last_change == 1
                 should_give_no_shows = iteration == day_for_simulation - 2
@@ -187,7 +223,6 @@ def get_tables(only_patients_from_call: bool = False):
                         delete_patient_by_id_from_queue(patient_id)
                         bed_iterator += 1
 
-            # TODO: upewnić sie czy to na pewno tu, czy za forem
             if day_for_simulation in patients_consent_dictionary:
                 patients_to_move = patients_consent_dictionary[day_for_simulation]
                 for patient in patients_to_move:
@@ -220,7 +255,9 @@ def move_patient_to_bed_assignment(patient_id: int) -> BedAssignmentsAndQueue:
     global session
     delete_patient_by_id_from_queue(patient_id)
 
-    bed_id: int = get_first_free_bed()
+    bed_id: int | None = get_first_free_bed()
+    if bed_id is None:
+        raise Exception("No free bed found")
     days = random.randint(1, 7)
     # assign_bed_to_patient(bed_id, patient_id, days, True) # assign bed robimy tylko w get_tables
 
