@@ -20,7 +20,7 @@ app = FastAPI()
 day_for_simulation = 1
 last_change = 1
 session = get_session()
-random.seed(43)
+random.seed(44)
 patients_consent_dictionary: dict[int, list[dict]] = {}
 
 
@@ -61,7 +61,9 @@ def delete_patient_by_id_from_queue(patient_id: int):
 
 def get_first_free_bed() -> int:
     global session
-    return session.query(BedAssignment).filter_by(patient_id=0).first().bed_id
+    result = session.query(BedAssignment).filter_by(patient_id=0).first().bed_id
+    print("first free bed for patient: ", result)
+    return result
 
 
 @app.get("/get-bed-assignments-and-queue", response_model=BedAssignmentsAndQueue)
@@ -239,4 +241,4 @@ def rollback_session():  # in front-end: call at the end of the day (or before)
     return {"status": 200}
 
 
-session.close()
+# session.close()

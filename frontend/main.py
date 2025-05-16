@@ -127,7 +127,7 @@ def reload_page(only_patients_from_call: bool = False) -> None:
             st.info("No bed assignments found.")
 
         if len(bed_df[bed_df["patient_id"] == 0]) > 0:
-            st.session_state.queue_id = 1
+            st.session_state.queue_id = 0
             st.session_state.patient_id = queue_df["patient_id"][st.session_state.queue_id]
             name = queue_df["patient_name"][st.session_state.queue_id].split()[0]
             surname = queue_df["patient_name"][st.session_state.queue_id].split()[1]
@@ -135,7 +135,7 @@ def reload_page(only_patients_from_call: bool = False) -> None:
             response = requests.get("http://backend:8000/get-patient-data", params={"patient_id": st.session_state.patient_id})
             st.session_state.consent = False
             st.sidebar.button(
-                "Call patient 📞",
+                f"Call patient {name} {surname} 📞",
                 on_click=lambda: agent_call(
                     name=name,
                     surname=surname,
