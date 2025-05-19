@@ -48,7 +48,6 @@ def update_day(delta: int = Query(...)):
 def assign_bed_to_patient(bed_id: int, patient_id: int, days: int, log: bool):
     global session
     assignment = BedAssignment(bed_id=bed_id, patient_id=patient_id, days_of_stay=days)
-    logger.info(f"adding assignment: {assignment}")
     session.add(assignment)
     if log:
         logger.info(f"Assigned bed {bed_id} to patient {patient_id} for {days} days")
@@ -57,9 +56,11 @@ def assign_bed_to_patient(bed_id: int, patient_id: int, days: int, log: bool):
 def delete_patient_by_id_from_queue(patient_id: int):
     global session
     entry = session.query(PatientQueue).filter_by(patient_id=patient_id).order_by(PatientQueue.queue_id).first()
+    logger.info(f"patient to be deleted: {type(entry)} \n {entry}")
     if entry:
         session.delete(entry)
         queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
+        logger.info(f"queue after deletion: {type(queue)} \n {queue}")
         for i, entry in enumerate(queue):
             entry.queue_id = i + 1
 
@@ -67,15 +68,19 @@ def delete_patient_by_id_from_queue(patient_id: int):
 def get_first_free_bed() -> int | None:
     global session
 
-    # bed_assignments = []
-    for bed in (
+    hospital = (
         session.query(Bed)
         .join(BedAssignment, Bed.bed_id == BedAssignment.bed_id, isouter=True)
         .join(Patient, BedAssignment.patient_id == Patient.patient_id, isouter=True)
         .order_by(Bed.bed_id)
         .all()
-    ):
+    )
+    logger.info(f"hospital: {hospital}")
+
+    # bed_assignments = []
+    for bed in hospital:
         ba = session.query(BedAssignment).filter_by(bed_id=bed.bed_id).first()
+        logger.info(f"bed assignment: {ba}")
         if not ba:
             return bed.bed_id
     return None

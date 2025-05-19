@@ -13,6 +13,11 @@ class BedAssignmentResponse(BaseModel):
     PESEL: str
     days_of_stay: int
 
+    def __repr__(self):
+        return (
+            f"{self.bed_id=}, {self.patient_id=}, {self.patient_name=}, {self.sickness=}, {self.PESEL=}, {self.days_of_stay=}"
+        )
+
 
 class PatientQueueResponse(BaseModel):
     place_in_queue: int
@@ -20,10 +25,16 @@ class PatientQueueResponse(BaseModel):
     patient_name: str
     PESEL: str
 
+    def __repr__(self):
+        return f"{self.place_in_queue=} {self.patient_id=}, {self.patient_name=}, {self.PESEL=}"
+
 
 class NoShow(BaseModel):
     patient_id: int
     patient_name: str
+
+    def __repr__(self):
+        return f"{self.patient_id=}, {self.patient_name=}"
 
 
 class ListOfTables(BaseModel):
@@ -31,10 +42,16 @@ class ListOfTables(BaseModel):
     PatientQueue: list[PatientQueueResponse]
     NoShows: list[NoShow]
 
+    def __repr__(self):
+        return f"{self.BedAssignment=},\n {self.PatientQueue=},\n {self.NoShows=}"
+
 
 class BedAssignmentsAndQueue(BaseModel):
     BedAssignment: list[BedAssignmentResponse]
     PatientQueue: list[PatientQueueResponse]
+
+    def __repr__(self):
+        return f"{self.BedAssignment=},\n {self.PatientQueue=}"
 
 
 class Patient(Base):
@@ -53,6 +70,9 @@ class Patient(Base):
     def __str__(self):
         return f"patient_id: {self.patient_id}, name: {self.first_name + ' ' + self.last_name}"
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class Bed(Base):
     __tablename__ = "beds"
@@ -62,6 +82,9 @@ class Bed(Base):
 
     def __str__(self):
         return f"bed_id: {self.bed_id}"
+
+    def __repr__(self):
+        return self.__str__()
 
 
 class BedAssignment(Base):
@@ -76,6 +99,9 @@ class BedAssignment(Base):
     def __str__(self):
         return f"bed_id: {self.bed_id}, patient_id: {self.patient_id}, days_of_stay: {self.days_of_stay}"
 
+    def __repr__(self):
+        return self.__str__()
+
 
 class PatientQueue(Base):
     __tablename__ = "patient_queue"
@@ -86,3 +112,6 @@ class PatientQueue(Base):
 
     def __str__(self):
         return f"queue_id: {self.queue_id}, patient_id: {self.patient_id}"
+
+    def __repr__(self):
+        return self.__str__()
