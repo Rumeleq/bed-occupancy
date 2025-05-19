@@ -6,6 +6,7 @@ import traceback
 from pathlib import Path
 from typing import List
 
+import pandas as pd
 from db_operations import get_session
 from fastapi import FastAPI, Query
 from models import *
@@ -62,7 +63,7 @@ def delete_patient_by_id_from_queue(patient_id: int):
 def get_first_free_bed() -> int | None:
     global session
 
-    bed_assignments = []
+    # bed_assignments = []
     for bed in (
         session.query(Bed)
         .join(BedAssignment, Bed.bed_id == BedAssignment.bed_id, isouter=True)
@@ -219,6 +220,11 @@ def get_tables(only_patients_from_call: bool = False):
                             logger.info(f"Patient {patient_id} already has a bed")
                     else:
                         days = random.randint(1, 7)
+
+                        # if day_for_simulation in patients_consent_dictionary:
+                        #     patients_to_move = patients_consent_dictionary[day_for_simulation]
+                        #     for patient in patients_to_move:
+                        #         if not patient_id == patient['patient_id']:
                         assign_bed_to_patient(bed_ids[bed_iterator], patient_id, days, should_log)
                         delete_patient_by_id_from_queue(patient_id)
                         bed_iterator += 1
