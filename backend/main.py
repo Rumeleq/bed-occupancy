@@ -60,7 +60,6 @@ def delete_patient_by_id_from_queue(patient_id: int):
     if entry:
         session.delete(entry)
         queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
-        logger.info(f"queue after deletion: {type(queue)} \n {queue}")
         for i, entry in enumerate(queue):
             entry.queue_id = i + 1
 
@@ -178,9 +177,15 @@ def get_tables(only_patients_from_call: bool = False):
         return len(patients_to_release)
 
     def delete_patients_to_be_released():
+        query_result = session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0)
+        df = pd.DataFrame(query_result.all())
+        logger.info(f"real patients to release: \n {df}")
         session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0).delete(synchronize_session="auto")
 
     def check_if_patient_has_bed(patient_id: int) -> bool:
+        # query_result = session.query(BedAssignment).filter_by(patient_id=patient_id)
+        # df = pd.DataFrame(query_result.all())
+        # logger.info(f"checking if patient {patient_id} has been in bed:\n{df}")
         return session.query(BedAssignment).filter_by(patient_id=patient_id).first() is not None
 
     def get_patient_name_by_id(patient_id: int) -> str:
@@ -237,6 +242,10 @@ def get_tables(only_patients_from_call: bool = False):
                         assign_bed_to_patient(bed_ids[bed_iterator], patient_id, days, should_log)
                         delete_patient_by_id_from_queue(patient_id)
                         bed_iterator += 1
+
+            queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
+            queue_df = pd.DataFrame(queue)
+            logger.info(f"queue after deletion: {type(queue)} \n {queue_df}")
 
             if day_for_simulation in patients_consent_dictionary:
                 patients_to_move = patients_consent_dictionary[day_for_simulation]
