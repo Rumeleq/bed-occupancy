@@ -2,6 +2,7 @@ import json
 import logging.config
 import math
 import random
+import shutil
 import traceback
 from pathlib import Path
 from typing import List
@@ -24,6 +25,15 @@ last_change = 1
 session = get_session()
 random.seed(43)
 patients_consent_dictionary: dict[int, list[dict]] = {}
+
+# Get terminal width
+terminal_width = shutil.get_terminal_size().columns
+
+# Set pandas display width to match terminal
+pd.set_option("display.width", terminal_width)
+pd.set_option("display.max_columns", None)  # Show all columns instead of "..."
+pd.set_option("display.max_colwidth", None)  # Show full content in each cell
+pd.set_option("display.expand_frame_repr", True)  # Use the full width
 
 
 @app.get("/get-current-day")
@@ -56,7 +66,7 @@ def assign_bed_to_patient(bed_id: int, patient_id: int, days: int, log: bool):
 def delete_patient_by_id_from_queue(patient_id: int):
     global session
     entry = session.query(PatientQueue).filter_by(patient_id=patient_id).order_by(PatientQueue.queue_id).first()
-    logger.info(f"patient to be deleted: {type(entry)} \n {entry}")
+    logger.info(f"patient to be deleted: {entry}")
     if entry:
         session.delete(entry)
         queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
@@ -111,10 +121,10 @@ def get_first_free_bed() -> int | None:
     # else: return None
 
 
-@app.get("/get-bed-assignments-and-queue", response_model=BedAssignmentsAndQueue)
+@app.get("/get-bed-assignments-and-queue", response_model=dict[str, list[dict]])
 def get_bed_assignments_and_queue():
     global session
-    bed_assignments = []
+    bed_assignments: list[dict] = []
     for bed in (
         session.query(Bed)
         .join(BedAssignment, Bed.bed_id == BedAssignment.bed_id, isouter=True)
@@ -141,7 +151,7 @@ def get_bed_assignments_and_queue():
             }
         )
 
-    queue_data = []
+    queue_data: list[dict] = []
     for entry in session.query(PatientQueue).order_by(PatientQueue.queue_id).all():
         patient = session.query(Patient).filter_by(patient_id=entry.patient_id).first()
         queue_data.append(
@@ -152,7 +162,8 @@ def get_bed_assignments_and_queue():
                 "PESEL": f"...{patient.pesel[-3:]}",
             }
         )
-    return BedAssignmentsAndQueue(BedAssignment=bed_assignments, PatientQueue=queue_data)
+    return {"BedAssignments": bed_assignments, "PatientQueue": queue_data}
+    # return BedAssignmentsAndQueue(BedAssignment=bed_assignments, PatientQueue=queue_data)
 
 
 @app.get("/get-tables", response_model=ListOfTables)
@@ -178,7 +189,8 @@ def get_tables(only_patients_from_call: bool = False):
 
     def delete_patients_to_be_released():
         query_result = session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0)
-        df = pd.DataFrame(query_result.all())
+        data = [{"bed_id": i.bed_id, "patient_id": i.patient_id, "days": i.days_of_stay} for i in query_result.all()]
+        df = pd.DataFrame(data)
         logger.info(f"real patients to release: \n {df}")
         session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0).delete(synchronize_session="auto")
 
@@ -252,20 +264,23 @@ def get_tables(only_patients_from_call: bool = False):
                 for patient in patients_to_move:
                     assign_bed_to_patient(patient["bed_id"], patient["patient_id"], patient["days"], True)
 
-        bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
+        bed_assignments_and_queue: dict[str, list[dict]] = get_bed_assignments_and_queue()
+
+        logger.info(bed_assignments_and_queue)
 
         logger.info("RETURNED TABLES:")
-        ba_df = pd.DataFrame(bed_assignments_and_queue.BedAssignment)
-        pq_df = pd.DataFrame(bed_assignments_and_queue.PatientQueue)
+        ba_df = pd.DataFrame(bed_assignments_and_queue["BedAssignments"])
+        pq_df = pd.DataFrame(bed_assignments_and_queue["PatientQueue"])
         noShows_df = pd.DataFrame([n.model_dump() for n in no_shows_list])
 
-        logger.info(f"bed assignments: \n {ba_df}")
-        logger.info(f"patient queue: \n {pq_df}")
-        logger.info(f"no shows: \n {noShows_df}")
+        with pd.option_context("display.max_columns", None, "display.max_colwidth", None):
+            logger.info(f"bed assignments: \n {ba_df.to_string()}")
+            logger.info(f"patient queue: \n {pq_df[:15].to_string()}")
+            logger.info(f"no shows: \n {noShows_df.to_string()}")
 
         return ListOfTables(
-            BedAssignment=bed_assignments_and_queue.BedAssignment,
-            PatientQueue=bed_assignments_and_queue.PatientQueue,
+            BedAssignment=bed_assignments_and_queue["BedAssignments"],
+            PatientQueue=bed_assignments_and_queue["PatientQueue"],
             NoShows=[n.model_dump() for n in no_shows_list],
         )
 
@@ -283,8 +298,8 @@ def get_patient_data(patient_id: int):
     return {"sickness": patient.sickness, "old_day": old_day, "new_day": new_day}
 
 
-@app.get("/move-patient-to-bed-assignment", response_model=BedAssignmentsAndQueue)
-def move_patient_to_bed_assignment(patient_id: int) -> BedAssignmentsAndQueue:
+@app.get("/move-patient-to-bed-assignment")
+def move_patient_to_bed_assignment(patient_id: int):
     global session
     delete_patient_by_id_from_queue(patient_id)
 
@@ -299,9 +314,9 @@ def move_patient_to_bed_assignment(patient_id: int) -> BedAssignmentsAndQueue:
     else:
         patients_consent_dictionary[day_for_simulation] = [{"patient_id": patient_id, "days": days, "bed_id": bed_id}]
 
-    bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
+    # bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
-    return bed_assignments_and_queue
+    # return bed_assignments_and_queue
 
 
 @app.post("/rollback-session", response_model=dict[str, int])
