@@ -161,8 +161,8 @@ def reload_page() -> None:
 
         if not bed_df.empty:
             logger.info("beds are not empty, displaying beds")
-            for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
-                bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
+            # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
+            #     bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
             st.dataframe(bed_df, use_container_width=True, hide_index=True)
         else:
             logger.info("beds empty!")

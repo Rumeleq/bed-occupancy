@@ -84,13 +84,14 @@ def get_first_free_bed() -> int | None:
         .order_by(Bed.bed_id)
         .all()
     )
-    logger.info(f"hospital: {hospital}")
+    # logger.info(f"hospital: {hospital}")
 
     # bed_assignments = []
     for bed in hospital:
         ba = session.query(BedAssignment).filter_by(bed_id=bed.bed_id).first()
         logger.info(f"bed assignment: {ba}")
         if not ba:
+            logger.info(f"first free bed id: {bed.bed_id}")
             return bed.bed_id
     return None
 
@@ -263,10 +264,11 @@ def get_tables(only_patients_from_call: bool = False):
                 patients_to_move = patients_consent_dictionary[day_for_simulation]
                 for patient in patients_to_move:
                     assign_bed_to_patient(patient["bed_id"], patient["patient_id"], patient["days"], True)
+                    delete_patient_by_id_from_queue(patient["patient_id"])
 
         bed_assignments_and_queue: dict[str, list[dict]] = get_bed_assignments_and_queue()
 
-        logger.info(bed_assignments_and_queue)
+        # logger.info(bed_assignments_and_queue)
 
         logger.info("RETURNED TABLES:")
         ba_df = pd.DataFrame(bed_assignments_and_queue["BedAssignments"])
@@ -275,7 +277,7 @@ def get_tables(only_patients_from_call: bool = False):
 
         with pd.option_context("display.max_columns", None, "display.max_colwidth", None):
             logger.info(f"bed assignments: \n {ba_df.to_string()}")
-            logger.info(f"patient queue: \n {pq_df[:15].to_string()}")
+            logger.info(f"patient queue(1-15): \n {pq_df[:15].to_string()}")
             logger.info(f"no shows: \n {noShows_df.to_string()}")
 
         return ListOfTables(
@@ -301,7 +303,7 @@ def get_patient_data(patient_id: int):
 @app.get("/move-patient-to-bed-assignment")
 def move_patient_to_bed_assignment(patient_id: int):
     global session
-    delete_patient_by_id_from_queue(patient_id)
+    # delete_patient_by_id_from_queue(patient_id) # przeniesione do get-tables
 
     bed_id: int | None = get_first_free_bed()
     if bed_id is None:
