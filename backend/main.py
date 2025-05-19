@@ -254,6 +254,15 @@ def get_tables(only_patients_from_call: bool = False):
 
         bed_assignments_and_queue: BedAssignmentsAndQueue = get_bed_assignments_and_queue()
 
+        logger.info("RETURNED TABLES:")
+        ba_df = pd.DataFrame(bed_assignments_and_queue.BedAssignment)
+        pq_df = pd.DataFrame(bed_assignments_and_queue.PatientQueue)
+        noShows_df = pd.DataFrame([n.model_dump() for n in no_shows_list])
+
+        logger.info(f"bed assignments: \n {ba_df}")
+        logger.info(f"patient queue: \n {pq_df}")
+        logger.info(f"no shows: \n {noShows_df}")
+
         return ListOfTables(
             BedAssignment=bed_assignments_and_queue.BedAssignment,
             PatientQueue=bed_assignments_and_queue.PatientQueue,
