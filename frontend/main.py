@@ -150,7 +150,7 @@ def reload_page() -> None:
     logger.info("Starting to reload the page ...")
     global placeholder
     placeholder = st.empty()
-    logger.info("emtied the placeholder")
+    logger.info("emptied the placeholder")
     with placeholder.container():
         logger.info("fetching tables ...")
         tables = get_list_of_tables(st.session_state.only_patients_from_call)
