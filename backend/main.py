@@ -217,7 +217,7 @@ def get_tables(only_patients_from_call: bool = False):
             if (
                 (not only_patients_from_call) or iteration < day_for_simulation - 2
             ):  # przy iteracji z tego dnia, jeśli chcemy tylko pacjentów z calla, to nie wykona sie reszta kolejki
-                should_log = iteration == day_for_simulation - 2 and last_change == 1
+                should_log = True  # iteration == day_for_simulation - 2 and last_change == 1
                 should_give_no_shows = iteration == day_for_simulation - 2
 
                 decrement_days_of_stay()
@@ -256,15 +256,15 @@ def get_tables(only_patients_from_call: bool = False):
                         delete_patient_by_id_from_queue(patient_id)
                         bed_iterator += 1
 
-            queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
-            queue_df = pd.DataFrame(queue)
-            logger.info(f"queue after deletion: {type(queue)} \n {queue_df}")
-
             if day_for_simulation in patients_consent_dictionary:
                 patients_to_move = patients_consent_dictionary[day_for_simulation]
                 for patient in patients_to_move:
                     assign_bed_to_patient(patient["bed_id"], patient["patient_id"], patient["days"], True)
                     delete_patient_by_id_from_queue(patient["patient_id"])
+
+            queue = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
+            queue_df = pd.DataFrame(queue)
+            logger.info(f"queue after deletion: {type(queue)} \n {queue_df}")
 
         bed_assignments_and_queue: dict[str, list[dict]] = get_bed_assignments_and_queue()
 
