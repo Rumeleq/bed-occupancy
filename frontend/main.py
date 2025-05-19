@@ -1,9 +1,18 @@
+import logging.config
+from pathlib import Path
 from typing import Dict, Optional
 
 import pandas as pd
 import requests
 import streamlit as st
 from agent import *
+
+logger = logging.getLogger("hospital_logger")
+config_file = Path("./logger_config.json")
+with open(config_file) as f:
+    config = json.load(f)
+logging.config.dictConfig(config)
+
 
 if "day_for_simulation" not in st.session_state:
     print("setting page up for first time")
