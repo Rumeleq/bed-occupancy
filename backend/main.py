@@ -17,6 +17,7 @@ with open(config_file) as f:
     config = json.load(f)
 logging.config.dictConfig(config)
 
+logger.info("setting up variables")
 app = FastAPI()
 day_for_simulation = 1
 last_change = 1
@@ -28,6 +29,7 @@ patients_consent_dictionary: dict[int, list[dict]] = {}
 @app.get("/get-current-day")
 def get_current_day():
     global day_for_simulation
+    logger.info(f"{day_for_simulation=}")
     return {"day": day_for_simulation}
 
 
@@ -39,12 +41,14 @@ def update_day(delta: int = Query(...)):
     if delta == 1 and day_for_simulation < 20 or delta == -1 and day_for_simulation > 1:
         day_for_simulation += delta
         last_change = delta
+        logger.info(f"current day for simulation changed to {day_for_simulation}")
     return {"day": day_for_simulation}
 
 
 def assign_bed_to_patient(bed_id: int, patient_id: int, days: int, log: bool):
     global session
     assignment = BedAssignment(bed_id=bed_id, patient_id=patient_id, days_of_stay=days)
+    logger.info(f"adding assignment: {assignment}")
     session.add(assignment)
     if log:
         logger.info(f"Assigned bed {bed_id} to patient {patient_id} for {days} days")

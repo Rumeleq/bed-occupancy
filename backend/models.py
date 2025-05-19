@@ -50,12 +50,18 @@ class Patient(Base):
     bed_assignments = relationship("BedAssignment", back_populates="patient")
     queue_entry = relationship("PatientQueue", back_populates="patient")
 
+    def __str__(self):
+        return f"patient_id: {self.patient_id}, name: {self.first_name + ' ' + self.last_name}"
+
 
 class Bed(Base):
     __tablename__ = "beds"
     bed_id = Column(Integer, primary_key=True)
 
     assignments = relationship("BedAssignment", back_populates="bed")
+
+    def __str__(self):
+        return f"bed_id: {self.bed_id}"
 
 
 class BedAssignment(Base):
@@ -67,6 +73,9 @@ class BedAssignment(Base):
     bed = relationship("Bed", back_populates="assignments")
     patient = relationship("Patient", back_populates="bed_assignments")
 
+    def __str__(self):
+        return f"bed_id: {self.bed_id}, patient_id: {self.patient_id}, days_of_stay: {self.days_of_stay}"
+
 
 class PatientQueue(Base):
     __tablename__ = "patient_queue"
@@ -74,3 +83,6 @@ class PatientQueue(Base):
     patient_id = Column(Integer, ForeignKey("patients.patient_id"))
 
     patient = relationship("Patient", back_populates="queue_entry")
+
+    def __str__(self):
+        return f"queue_id: {self.queue_id}, patient_id: {self.patient_id}"
