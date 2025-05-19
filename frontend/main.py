@@ -78,7 +78,7 @@ def agent_call(patient_id: int, name: str, surname: str, pesel: str, sickness: s
         global placeholder
         placeholder.empty()
         with placeholder.container():
-            st.write("loading ... ")
+            st.write("loading... ")
         # reload_page()
         # global queue_df, bed_df
         #
@@ -98,7 +98,7 @@ def agent_call(patient_id: int, name: str, surname: str, pesel: str, sickness: s
 
 def get_list_of_tables(only_patients_from_call: bool = False) -> Optional[Dict]:
     try:
-        logger.info(f"getting list of tables, with parameter {only_patients_from_call=} ...")
+        logger.info(f"getting list of tables, with parameter {only_patients_from_call=}...")
         response = requests.get("http://backend:8000/get-tables", params={"only_patients_from_call": only_patients_from_call})
         logger.info("got list of tables")
     except Exception as e:
@@ -147,12 +147,12 @@ def simulate_previous_day() -> None:
 
 # TODO: zrobić jakiś mechanizm lub funkcję/ cokolwiek co reprezentowałoby 1 dzień symulacji
 def reload_page() -> None:
-    logger.info("Starting to reload the page ...")
+    logger.info("Starting to reload the page...")
     global placeholder
     placeholder = st.empty()
     logger.info("emptied the placeholder")
     with placeholder.container():
-        logger.info("fetching tables ...")
+        logger.info("fetching tables...")
         tables = get_list_of_tables(st.session_state.only_patients_from_call)
         bed_df = pd.DataFrame(tables["BedAssignment"])
         queue_df = pd.DataFrame(tables["PatientQueue"])
@@ -160,9 +160,9 @@ def reload_page() -> None:
         logger.info("tables fetched")
 
         if not bed_df.empty:
-            logger.info("beds are not empty -> displaying beds")
-            # for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
-            #    bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
+            logger.info("beds are not empty, displaying beds")
+            for col in ["patient_id", "patient_name", "sickness", "days_of_stay"]:
+                bed_df[col] = bed_df[col].apply(lambda x: None if x == 0 or x == "Unoccupied" else x)
             st.dataframe(bed_df, use_container_width=True, hide_index=True)
         else:
             logger.info("beds empty!")
