@@ -93,6 +93,11 @@ def create_box_grid(df: pd.DataFrame, boxes_per_row=4) -> None:
                     for column, value in data_row.items():
                         tooltip_info += f"**{column}**: {value}\n\n"
 
+                    logger.info(type(data_row))
+                    logger.info(data_row)
+                    logger.info(type(data_row.items()))
+                    logger.info(data_row.items())
+
                     # row_string = pd.DataFrame(data_row.items()).to_string()
 
                     # Add tooltip using Streamlit's help feature
