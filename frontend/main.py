@@ -16,6 +16,14 @@ if "day_for_simulation" not in st.session_state:
 if "refreshes_number" not in st.session_state:
     st.session_state.refreshes_number = 0
 
+
+logger = logging.getLogger("hospital_logger")
+config_file = Path("logger_config.json")
+with open(config_file) as f:
+    config = json.load(f)
+logging.config.dictConfig(config)
+
+
 st.html(
     """
     <style>
@@ -98,10 +106,10 @@ def create_box_grid(df: pd.DataFrame, boxes_per_row=4) -> None:
                     logger.info(type(data_row.items()))
                     logger.info(data_row.items())
 
-                    # row_string = pd.DataFrame(data_row.items()).to_string()
+                    row_string = data_row.to_frame().to_string()
 
                     # Add tooltip using Streamlit's help feature
-                    st.caption("", help=tooltip_info)
+                    st.caption("", help=row_string)
 
 
 def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int) -> bool:
