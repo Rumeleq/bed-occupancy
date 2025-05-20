@@ -98,18 +98,24 @@ def create_box_grid(df: pd.DataFrame, boxes_per_row=4) -> None:
 
                     # Format tooltip information with row data
                     tooltip_info = ""
+                    columns = ""
+                    rows = ""
                     for column, value in data_row.items():
-                        tooltip_info += f"**{column}**: {value}\n\n"
+                        columns += f"{column:>{max(len(column), len(value))}} "
+                        rows += f"{value:>{max(len(column), len(value))}} "
+                    tooltip_info = columns + "\n\n" + rows
 
-                    logger.info(type(data_row))
-                    logger.info(data_row)
-                    logger.info(type(data_row.items()))
-                    logger.info(data_row.items())
+                    # logger.info(type(data_row))
+                    # logger.info(data_row)
+                    # logger.info(type(data_row.items()))
+                    # logger.info(data_row.items())
 
-                    row_string = data_row.to_frame().to_string()
+                    # row_string = data_row.to_frame().to_string()
+                    # logger.info(data_row.to_frame())
+                    # logger.info(data_row.to_frame().to_string())
 
                     # Add tooltip using Streamlit's help feature
-                    st.caption("", help=row_string)
+                    st.caption("", help=tooltip_info)
 
 
 def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int) -> bool:
