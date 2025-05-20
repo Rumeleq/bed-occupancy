@@ -89,14 +89,14 @@ def create_box_grid(df: pd.DataFrame, boxes_per_row=4) -> None:
                         st.markdown(f"""<div class="box box-occupied">{box_title}</div>""", unsafe_allow_html=True)
 
                     # Format tooltip information with row data
-                    # tooltip_info = ""
-                    # for column, value in data_row.items():
-                    #     tooltip_info += f"**{column}**: {value}\n\n"
+                    tooltip_info = ""
+                    for column, value in data_row.items():
+                        tooltip_info += f"**{column}**: {value}\n\n"
 
-                    row_string = pd.DataFrame(data_row.items()).to_string()
+                    # row_string = pd.DataFrame(data_row.items()).to_string()
 
                     # Add tooltip using Streamlit's help feature
-                    st.caption("", help=row_string)
+                    st.caption("", help=tooltip_info)
 
 
 def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int) -> bool:
