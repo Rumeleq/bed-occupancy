@@ -96,26 +96,58 @@ def create_box_grid(df: pd.DataFrame, boxes_per_row=4) -> None:
                     else:
                         st.markdown(f"""<div class="box box-occupied">{box_title}</div>""", unsafe_allow_html=True)
 
-                    # Format tooltip information with row data
-                    tooltip_info = ""
-                    columns = ""
-                    rows = ""
+                    # tooltip_info = "<table style='border-collapse: collapse; width: 100%;'>"
+
+                    tooltip_text = []
+
+                    # Find the maximum length for each column for alignment
+                    max_lengths = {}
                     for column, value in data_row.items():
-                        columns += f"{column:>{max(len(column), len(value))}} "
-                        rows += f"{value:>{max(len(column), len(value))}} "
-                    tooltip_info = columns + "\n\n" + rows
+                        display_value = str(value) if pd.notna(value) else "None"
+                        max_lengths[column] = max(len(str(column)), len(display_value))
 
-                    # logger.info(type(data_row))
-                    # logger.info(data_row)
-                    # logger.info(type(data_row.items()))
-                    # logger.info(data_row.items())
+                    # Create header row
+                    header = "  ".join(f"{col:<{max_lengths[col]}}" for col in data_row.index)
+                    tooltip_text.append(header)
 
-                    # row_string = data_row.to_frame().to_string()
-                    # logger.info(data_row.to_frame())
-                    # logger.info(data_row.to_frame().to_string())
+                    # Add separator
+                    separator = "  ".join("-" * max_lengths[col] for col in data_row.index)
+                    tooltip_text.append(separator)
+
+                    # Add data row
+                    values = []
+                    for col, val in zip(data_row.index, data_row.values):
+                        display_val = str(val) if pd.notna(val) else "None"
+                        values.append(f"{display_val:<{max_lengths[col]}}")
+                    data_line = "  ".join(values)
+                    tooltip_text.append(data_line)
+
+                    # Join all lines
+                    tooltip_info = "\n".join(tooltip_text)
 
                     # Add tooltip using Streamlit's help feature
-                    st.caption("", help=tooltip_info)
+                    st.markdown("", help=tooltip_info)
+                    # Format tooltip information with row data
+                    # tooltip_info = ""
+                    # columns = "|"
+                    # rows = "|"
+                    # for column, value in data_row.items():
+                    #     columns += f"{column:>{max(len(column), len(str(value)))}}|"
+                    #     rows += f"{value:>{max(len(column), len(str(value)))}}|"
+                    # if len(columns) != len(rows):
+                    #     logger.info("error, {0}, {1}".format(len(columns), len(rows)))
+                    # tooltip_info = f"{columns}\n{"-"*len(columns)}\n{rows}"
+                    # # logger.info(type(data_row))
+                    # # logger.info(data_row)
+                    # # logger.info(type(data_row.items()))
+                    # # logger.info(data_row.items())
+                    #
+                    # # row_string = data_row.to_frame().to_string()
+                    # # logger.info(data_row.to_frame())
+                    # # logger.info(data_row.to_frame().to_string())
+                    #
+                    # # Add tooltip using Streamlit's help feature
+                    # st.markdown("", help=tooltip_info)
 
 
 def handle_patient_rescheduling(name: str, surname: str, pesel: str, sickness: str, old_day: int, new_day: int) -> bool:
