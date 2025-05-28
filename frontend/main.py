@@ -377,8 +377,8 @@ if not queue_df.empty:
         _("Patient's number"),
         _("Patient's name"),
         _("Personal number"),
-        "admission_day",
-        "days_of_stay",
+        _("Admission day"),
+        _("Days of stay"),
     ]
 
     if len(tables["DaysOfStayForReplacement"]) > 0 and len(queue_df) > 0:
