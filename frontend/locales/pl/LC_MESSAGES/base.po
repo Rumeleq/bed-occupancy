@@ -101,6 +101,14 @@ msgstr "Kolejka pacjentów"
 msgid "Place in queue"
 msgstr "Miejsce w kolejce"
 
+#: main.py:380
+msgid "Admission day"
+msgstr "Dzień przyjęcia"
+
+#: main.py:381
+msgid "Days of stay"
+msgstr "Ilość dni pobytu"
+
 #: main.py:340
 msgid "No patients found in the queue."
 msgstr "W kolejce nie ma żadnych pacjentów"

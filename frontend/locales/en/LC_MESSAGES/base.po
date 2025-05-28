@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2025-05-26 17:28+0200\n"
-"PO-Revision-Date: 2025-05-26 17:28+0200\n"
+"POT-Creation-Date: 2025-05-28 10:50+0200\n"
+"PO-Revision-Date: 2025-05-28 10:51+0200\n"
 "Last-Translator: U-DESKTOP-6RAEH9E\\wikto <wikto@desktop-6raeh9e>\n"
 "Language-Team: English\n"
 "MIME-Version: 1.0\n"
@@ -16,178 +16,186 @@ msgstr ""
 "Language: en\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: main.py:23
+#: main.py:24
 msgid "Current state"
 msgstr "Current state"
 
-#: main.py:23
+#: main.py:24
 msgid "Data analysis"
 msgstr "Data analysis"
 
-#: main.py:24
+#: main.py:25
 msgid "Bed Assignments"
 msgstr "Bed Assignments"
 
-#: main.py:146
+#: main.py:157
 msgid "Bed"
 msgstr "Bed"
 
-#: main.py:154 main.py:332 main.py:345
+#: main.py:165 main.py:377 main.py:395
 msgid "Patient's number"
 msgstr "Patient's number"
 
-#: main.py:155 main.py:332 main.py:345
+#: main.py:166 main.py:378 main.py:395
 msgid "Patient's name"
 msgstr "Patient's name"
 
-#: main.py:156
+#: main.py:167
 msgid "Sickness"
 msgstr "Sickness"
 
-#: main.py:157 main.py:332
+#: main.py:168 main.py:379
 msgid "Personal number"
 msgstr "Personal number"
 
-#: main.py:158
+#: main.py:169
 msgid "Days left"
 msgstr "Days left"
 
-#: main.py:173
+#: main.py:191
 msgid "This bed is empty!"
 msgstr "This bed is empty!"
 
-#: main.py:233
+#: main.py:250
 msgid "agreed to reschedule"
 msgstr "agreed to reschedule"
 
-#: main.py:238
+#: main.py:256
 msgid "did not agree to reschedule"
 msgstr "did not agree to reschedule"
 
-#: main.py:242
+#: main.py:260
 msgid "'s consent is unknown."
 msgstr "'s consent is unknown."
 
-#: main.py:256
+#: main.py:274
 msgid "Failed to fetch data from the server."
 msgstr "Failed to fetch data from the server."
 
-#: main.py:259 main.py:269 main.py:290
+#: main.py:277 main.py:288 main.py:310
 msgid "Failed to connect to the server"
 msgstr "Failed to connect to the server"
 
-#: main.py:305
+#: main.py:339
 msgid "Day"
 msgstr "Day"
 
-#: main.py:310 main.py:314
+#: main.py:345 main.py:354
 msgid "Call next patient in queue"
 msgstr "Call next patient in queue"
 
-#: main.py:312
+#: main.py:350
 msgid "Call patient again"
 msgstr "Call patient again"
 
-#: main.py:321
+#: main.py:363
 msgid "No bed assignments found."
 msgstr "No bed assignments found."
 
-#: main.py:323
+#: main.py:365
 msgid "Patients in queue"
 msgstr "Patients in queue"
 
-#: main.py:332
+#: main.py:376
 msgid "Place in queue"
 msgstr "Place in queue"
 
-#: main.py:340
+#: main.py:380
+msgid "Admission day"
+msgstr "Admission day"
+
+#: main.py:381
+msgid "Days of stay"
+msgstr "Days of stay"
+
+#: main.py:390
 msgid "No patients found in the queue."
 msgstr "No patients found in the queue."
 
-#: main.py:342
+#: main.py:392
 msgid "Patients absent on a given day"
 msgstr "Patients absent on a given day"
 
-#: main.py:348
+#: main.py:398
 msgid "No no-shows found."
 msgstr "No no-shows found."
 
-#: main.py:350
+#: main.py:400
 msgid "Activate automatic day change"
 msgstr "Activate automatic day change"
 
-#: main.py:353
+#: main.py:403
 msgid "Reset simulation"
 msgstr "Reset simulation"
 
-#: main.py:355
+#: main.py:405
 msgid "Bed occupancy statistics"
 msgstr "Bed occupancy statistics"
 
-#: main.py:361
+#: main.py:411
 msgid "Beds occupancy"
 msgstr "Beds occupancy"
 
-#: main.py:364 main.py:374 main.py:384 main.py:409 main.py:419
+#: main.py:414 main.py:424 main.py:434 main.py:459 main.py:469
 msgid "No previous day"
 msgstr "No previous day"
 
-#: main.py:371
+#: main.py:421
 msgid "Average beds occupancy"
 msgstr "Average beds occupancy"
 
-#: main.py:381
+#: main.py:431
 msgid "Average length of stay"
 msgstr "Average length of stay"
 
-#: main.py:396 main.py:431 main.py:478
+#: main.py:446 main.py:481 main.py:528
 msgid "Date"
 msgstr "Date"
 
-#: main.py:397
+#: main.py:447
 msgid "Occupancy [%]"
 msgstr "Occupancy [%]"
 
-#: main.py:402
+#: main.py:452
 msgid "No-show statistics"
 msgstr "No-show statistics"
 
-#: main.py:406
+#: main.py:456
 msgid "No-shows percentage"
 msgstr "No-shows percentage"
 
-#: main.py:416
+#: main.py:466
 msgid "Average no-shows percentage"
 msgstr "Average no-shows percentage"
 
-#: main.py:435
+#: main.py:485
 msgid "Number of no-shows"
 msgstr "Number of no-shows"
 
-#: main.py:443
+#: main.py:493
 msgid "Phone calls statistics"
 msgstr "Phone calls statistics"
 
-#: main.py:447
+#: main.py:497
 msgid "Percentage of calls resulting in rescheduling"
 msgstr "Percentage of calls resulting in rescheduling"
 
-#: main.py:449 main.py:452 main.py:461 main.py:466
+#: main.py:499 main.py:502 main.py:511 main.py:516
 msgid "No calls made"
 msgstr "No calls made"
 
-#: main.py:459
+#: main.py:509
 msgid "Average percentage of calls resulting in rescheduling"
 msgstr "Average percentage of calls resulting in rescheduling"
 
-#: main.py:482
+#: main.py:532
 msgid "Number of phone calls completed"
 msgstr "Number of phone calls completed"
 
-#: main.py:491
+#: main.py:541
 msgid "Simulate Next Day"
 msgstr "Simulate Next Day"
 
-#: main.py:493
+#: main.py:543
 msgid "Simulate Previous Day"
 msgstr "Simulate Previous Day"
