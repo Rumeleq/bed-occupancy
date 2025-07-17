@@ -113,37 +113,48 @@ def establish_voice_conversation(conversation: Conversation) -> str | None:
         return None
 
 
-def check_patient_consent_to_reschedule(conversation_id: str) -> bool:
+def get_done_conversation_data(conversation_id: str, max_attempts: int = 60, attempt_interval: int = 5) -> str:
+    """
+    Waits until the conversation is completed and then returns its data in json format
+
+    :param conversation_id: The ID of the conversation to fetch the data.
+    :param max_attempts: Maximum number of times the API is called in order to get data that has 'status' == 'done'
+    :param attempt_interval: Seconds between API calls
+    :return: JSON as string - needs to be parsed to python dict
+    """
+    for attempt in range(max_attempts):
+        conversation_data = client.conversational_ai.get_conversation(conversation_id=conversation_id)
+        status = conversation_data.status
+        if status == "done":
+            return conversation_data
+        logger.info(f"Conversation status: {status} (Attempt {attempt + 1})")
+        time.sleep(attempt_interval)
+    else:
+        logger.warning("Conversation did not complete in time.")
+        return False
+
+
+def check_patient_consent_to_reschedule(conversation_id: str) -> dict:
     """
     Waits until the conversation is completed and then checks if the patient
     has given consent to reschedule their appointment.
 
     :param conversation_id: The ID of the conversation to analyze.
-    :return: A boolean indicating whether the patient agreed to reschedule.
+    :return: A dictionary containing:
+    - 'consent' (bool): Indicates whether the patient agreed to reschedule.
+    - 'verified' (bool): Indicates whether the verification was successful.
+    - 'called' (bool): Always True, indicating the function was executed.
     """
-    max_attempts = 60
-
-    for attempt in range(max_attempts):
-        conversation_data = client.conversational_ai.get_conversation(conversation_id=conversation_id)
-        status = conversation_data.status
-        if status == "done":
-            break
-        logger.info(f"Conversation status: {status} (Attempt {attempt + 1})")
-        time.sleep(5)
-    else:
-        logger.warning("Conversation did not complete in time.")
-        return False
-
-    new_conversation_data = client.conversational_ai.get_conversation(conversation_id=conversation_id)
+    conversation_data = get_done_conversation_data(conversation_id)
     result: bool = (
-        json.loads(new_conversation_data.analysis.json())
+        json.loads(conversation_data.analysis.json())
         .get("data_collection_results", {})
         .get("consent_to_change_the_date", {})
         .get("value", None)
     )
 
     success_of_verification: bool = (
-        json.loads(new_conversation_data.analysis.json())
+        json.loads(conversation_data.analysis.json())
         .get("data_collection_results", {})
         .get("verification_success", {})
         .get("value", None)
@@ -152,3 +163,21 @@ def check_patient_consent_to_reschedule(conversation_id: str) -> bool:
     logger.info(f"Patient's verification status: {success_of_verification}")
     logger.info(f"Patient agreed: {result}")
     return {"consent": result, "verified": success_of_verification, "called": True}
+
+
+def fetch_transcription(conversation_id: str) -> list[dict]:
+    """
+    Waits until the conversation is completed and then returns the transcript
+    of the given conversation.
+
+    :param conversation_id: The ID of the conversation to analyze.
+    :return: List of python dictionaries that has 2 keys: "role" and "message"
+    """
+    conversation_data = get_done_conversation_data(conversation_id)
+    # get transcript of the call
+    transcript: list[dict] = json.loads(conversation_data.json()).get("transcript")
+    # filter out transcript to have only roles and messages without empty messages or situations of using an agent tool such as 'end_call'
+    transcript = [{"role": entry["role"], "message": entry["message"]} for entry in transcript]
+    transcript = list(filter(lambda data: data["message"] is not None, transcript))
+
+    return transcript

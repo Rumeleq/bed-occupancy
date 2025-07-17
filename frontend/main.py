@@ -31,7 +31,7 @@ _ = translate_page(st.session_state.interface_language)
 
 st.set_page_config(page_title=_("Hospital bed management"), page_icon="🏥")
 
-main_tab, statistics_tab = st.tabs([_("Current state"), _("Data analysis")])
+main_tab, statistics_tab, transcript_tab = st.tabs([_("Current state"), _("Data analysis"), _("Transcriptions")])
 main_tab.title(_("Bed Assignments"))
 
 ui_languages = ["en", "pl"]
@@ -52,6 +52,10 @@ if "consent" not in st.session_state:
     st.session_state.consent = False
 if "replacement_start_index" not in st.session_state:
     st.session_state.replacement_start_index = 0
+if "transcriptions" not in st.session_state:
+    st.session_state.transcriptions = []
+if len(st.session_state.transcriptions) == 0:
+    transcript_tab.info(_("No transcriptions avaiable, call patient in order to see transcriptions"))
 
 today = datetime.today().date()
 
@@ -272,7 +276,7 @@ def create_box_grid(df: pd.DataFrame, actions_required_number: int, boxes_per_ro
 
 def handle_patient_rescheduling(
     name: str, surname: str, gender: str, pesel: str, medical_procedure: str, old_day: int, new_day: int, use_ua_agent: bool
-) -> bool:
+) -> dict:
     """
     Handles the process of rescheduling a patient's appointment by initiating a voice conversation
     with the patient and analyzing their consent.
@@ -284,14 +288,16 @@ def handle_patient_rescheduling(
     :param medical_procedure: The medical procedure that the patient will undergo.
     :param old_day: The current day of the patient's visit.
     :param new_day: The suggested day for the new appointment.
-    :return: A boolean indicating whether the patient consented to the rescheduling.
+    :return: A dictionary containing keys: "consent", "verified", "called" and "transcript". \n
+        "consent" is a boolean indicating whether the patient consented to the rescheduling.
     """
 
     if st.session_state.phone_number is not None:
         conversation_id = call_patient(
             name, surname, gender, pesel, medical_procedure, old_day, new_day, use_ua_agent, str(st.session_state.phone_number)
         )
-        return check_patient_consent_to_reschedule(conversation_id)
+        transcript = fetch_transcription(conversation_id)
+        return {**check_patient_consent_to_reschedule(conversation_id), "transcript": transcript}
     else:
         return {"consent": None, "verified": None, "called": False}
 
@@ -355,6 +361,26 @@ def agent_call(
             st.session_state.pop("current_patient_index", None)
     else:
         main_tab.info(f"{name} {surname}{_("'s consent is unknown.")}.")
+
+    if "transcript" in call_results and len(call_results["transcript"]) > 0:
+        st.session_state.transcriptions.append(
+            {
+                "day": st.session_state.day_for_simulation,
+                "patient": f"{name} {surname}",
+                "transcript": call_results["transcript"],
+            }
+        )
+
+        transcript_tab.empty()
+        display_transcriptions()
+
+
+def display_transcriptions():
+    for transcript in st.session_state.transcriptions:
+        expander = transcript_tab.expander(f"{transcript['day']}: Call with {transcript['patient']}")
+        for message in transcript["transcript"]:
+            msg = expander.chat_message(message["role"] if message["role"] == "user" else "ai")
+            msg.write(message["message"])
 
 
 def call_next_patient_in_queue(
@@ -494,6 +520,8 @@ if "current_patient_index" not in st.session_state:
 main_tab.header(
     f"{_('Day')} {st.session_state.day_for_simulation} - {calculate_simulation_date(st.session_state.day_for_simulation).strftime('%Y-%m-%d')}"
 )
+
+display_transcriptions()
 
 if len(replacement_days_of_stay) > 0 and st.session_state.current_patient_index >= 0:
     st.session_state.auto_day_change = False
