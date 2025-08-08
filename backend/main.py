@@ -102,31 +102,36 @@ def get_tables_and_statistics() -> ListOfTables:
     def decrement_days_of_stay():
         session.query(BedAssignment).update({BedAssignment.days_of_stay: BedAssignment.days_of_stay - 1})
 
-    def print_patients_to_be_released(log: bool):
+    def print_patients_to_be_released():
         patients_to_release = (
             session.query(Patient)
-            .filter(Patient.patient_id.in_(session.query(BedAssignment.patient_id).filter(BedAssignment.days_of_stay <= 0)))
+            .filter(Patient.patient_id.in_(session.query(BedAssignment.patient_id).filter(BedAssignment.days_of_stay <= 1)))
             .all()
         )
-        if log and patients_to_release:
+        if patients_to_release:
             logger.info(
                 "Patients to be released from hospital:\n"
                 + "\n".join(f"Patient ID: {p.patient_id}, Name: {p.first_name} {p.last_name}" for p in patients_to_release)
             )
 
     def delete_patients_to_be_released():
-        session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 0).delete(synchronize_session=False)
+        session.query(BedAssignment).filter(BedAssignment.days_of_stay <= 1).delete(synchronize_session=False)
 
-    def assign_bed_to_patient(bed_id: int, patient_id: int, procedure_id: int, days: int, personnel: list, log: bool):
-        assignment = BedAssignment(bed_id=bed_id, patient_id=patient_id, procedure_id=procedure_id, days_of_stay=days)
-        session.add(assignment)
-        for personnel_member in personnel:
-            session.add(StayPersonnelAssignment(bed_id=bed_id, member_id=personnel_member.member_id))
-        if log:
-            logger.info(f"Assigned bed {bed_id} to patient {patient_id} for {days} days")
+    def assign_beds_to_patients(assignments_data: list, log: bool):
+        bed_assignments = []
+        personnel_assignments = []
+        for bed_id, patient_id, procedure_id, days, personnel in assignments_data:
+            bed_assignments.append(
+                {"bed_id": bed_id, "patient_id": patient_id, "procedure_id": procedure_id, "days_of_stay": days}
+            )
 
-    def check_if_patient_has_bed(patient_id: int) -> bool:
-        return session.query(BedAssignment).filter_by(patient_id=patient_id).first() is not None
+            for personnel_member in personnel:
+                personnel_assignments.append({"bed_id": bed_id, "member_id": personnel_member.member_id})
+            if log:
+                logger.info(f"Assigned bed {bed_id} to patient {patient_id} for {days} days")
+
+        session.bulk_insert_mappings(BedAssignment, bed_assignments)
+        session.bulk_insert_mappings(StayPersonnelAssignment, personnel_assignments)
 
     def delete_patient_by_queue_id_from_queue(queue_id: int):
         entry = (
@@ -308,9 +313,10 @@ def get_tables_and_statistics() -> ListOfTables:
             should_log = iteration == day - 2 and rollback_flag == 1
             should_give_no_shows = iteration == day - 2
 
-            decrement_days_of_stay()
-            print_patients_to_be_released(log=should_log)
+            if should_log:
+                print_patients_to_be_released()
             delete_patients_to_be_released()
+            decrement_days_of_stay()
 
             assigned_beds = session.query(BedAssignment.bed_id).scalar_subquery()
             beds = (
@@ -322,9 +328,7 @@ def get_tables_and_statistics() -> ListOfTables:
 
             bed_map = {}
             for department_id, bed_id in beds:
-                if department_id not in bed_map:
-                    bed_map[department_id] = []
-                bed_map[department_id].append(bed_id)
+                bed_map.setdefault(department_id, []).append(bed_id)
 
             occupied_beds_number = beds_number - len(beds)
             no_shows_number = 0
@@ -339,7 +343,8 @@ def get_tables_and_statistics() -> ListOfTables:
                 .order_by(PatientQueue.queue_id)
                 .all()
             )
-            bed_iterator = 0
+
+            assignments_to_create = []
 
             days_of_stay_for_replacement = []
             personnels_for_replacement = []
@@ -364,63 +369,61 @@ def get_tables_and_statistics() -> ListOfTables:
                     departments_for_replacement.append(entry.medical_procedure.department.name)
 
                     delete_patient_by_queue_id_from_queue(entry.queue_id)
-                    no_show = NoShow(patient_id=patient_id, patient_name=get_patient_name_by_id(patient_id))
                     if should_give_no_shows:
+                        no_show = NoShow(patient_id=patient_id, patient_name=get_patient_name_by_id(patient_id))
                         no_shows_list.append(no_show)
                     if should_log:
                         logger.info(f"No-show: {no_show.patient_name}")
-                elif check_if_patient_has_bed(patient_id):
-                    if should_log:
-                        logger.info(f"Patient {patient_id} already has a bed")
                 else:
                     if iteration + 2 not in stay_lengths:
                         stay_lengths[iteration + 2] = []
                     stay_lengths[iteration + 2].append(entry.days_of_stay)
 
-                    assign_bed_to_patient(
-                        bed_map[entry.medical_procedure.department_id][0],
-                        patient_id,
-                        entry.procedure_id,
-                        entry.days_of_stay,
-                        entry.personnel_queue_assignment,
-                        should_log,
+                    assignments_to_create.append(
+                        (
+                            bed_map[entry.medical_procedure.department_id][0],
+                            patient_id,
+                            entry.procedure_id,
+                            entry.days_of_stay,
+                            entry.personnel_queue_assignment,
+                        )
                     )
+
                     delete_patient_by_queue_id_from_queue(entry.queue_id)
                     bed_map[entry.medical_procedure.department_id].pop(0)
                     occupied_beds_number += 1
-                    bed_iterator += 1
+
+            queue_entries = session.query(PatientQueue).filter(PatientQueue.queue_id.in_(consent_dict[iteration + 2])).all()
+            queue_entries_map = {entry.queue_id: entry for entry in queue_entries}
 
             for queue_id in consent_dict[iteration + 2]:
-                queue_entry = (
-                    session.query(PatientQueue)
-                    .filter_by(queue_id=queue_id)
-                    .options(joinedload(PatientQueue.medical_procedure), joinedload(PatientQueue.personnel_queue_assignment))
-                    .first()
-                )
-                if check_if_patient_has_bed(queue_entry.patient_id):
-                    if should_log:
-                        logger.info(f"Patient {queue_entry.patient_id} already has a bed")
-                else:
-                    if iteration + 2 not in stay_lengths:
-                        stay_lengths[iteration + 2] = []
-                    stay_lengths[iteration + 2].append(queue_entry.days_of_stay)
+                queue_entry = queue_entries_map[queue_id]
 
-                    assign_bed_to_patient(
+                if iteration + 2 not in stay_lengths:
+                    stay_lengths[iteration + 2] = []
+                stay_lengths[iteration + 2].append(queue_entry.days_of_stay)
+
+                assignments_to_create.append(
+                    (
                         bed_map[queue_entry.medical_procedure.department_id][0],
                         queue_entry.patient_id,
                         queue_entry.procedure_id,
                         queue_entry.days_of_stay,
                         queue_entry.personnel_queue_assignment,
-                        should_log,
                     )
-                    delete_patient_by_queue_id_from_queue(queue_id)
-                    bed_map[queue_entry.medical_procedure.department_id].pop(0)
-                    occupied_beds_number += 1
-                    bed_iterator += 1
+                )
 
-            days_of_stay_for_replacement = days_of_stay_for_replacement[len(consent_dict[iteration + 2]) :]
-            personnels_for_replacement = personnels_for_replacement[len(consent_dict[iteration + 2]) :]
-            departments_for_replacement = departments_for_replacement[len(consent_dict[iteration + 2]) :]
+                delete_patient_by_queue_id_from_queue(queue_id)
+                bed_map[queue_entry.medical_procedure.department_id].pop(0)
+                occupied_beds_number += 1
+
+            assign_beds_to_patients(assignments_to_create, should_log)
+
+            consent_count = len(consent_dict[iteration + 2])
+
+            days_of_stay_for_replacement = days_of_stay_for_replacement[consent_count:]
+            personnels_for_replacement = personnels_for_replacement[consent_count:]
+            departments_for_replacement = departments_for_replacement[consent_count:]
 
             occupancy_in_time["Date"].append(iteration + 2)
             occupancy_in_time["Occupancy"].append(occupied_beds_number / beds_number * 100)
