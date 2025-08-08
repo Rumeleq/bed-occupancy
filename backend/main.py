@@ -37,6 +37,9 @@ day_for_simulation = 1
 last_change = 1
 patients_consent_dictionary: dict[int, list[int]] = {1: []}
 calls_in_time: dict[str, list] = {"Date": [1], "CallsNumber": [0]}
+session = get_session()
+session_savepoints = [None] * 19
+latest_savepoint_index = 0
 
 
 @app.get("/get-current-day", response_model=Dict[str, int])
@@ -292,7 +295,6 @@ def get_tables_and_statistics() -> ListOfTables:
     try:
         rnd = random.Random()
         rnd.seed(43)
-        session = get_session()
 
         stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
 
@@ -309,7 +311,7 @@ def get_tables_and_statistics() -> ListOfTables:
         personnels_for_replacement: List[Dict[str, str]] = []
         departments_for_replacement: List[str] = []
 
-        for iteration in range(day - 1):
+        for iteration in range(latest_savepoint_index, day - 1):
             should_log = iteration == day - 2 and rollback_flag == 1
             should_give_no_shows = iteration == day - 2
 
