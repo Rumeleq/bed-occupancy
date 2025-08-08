@@ -3,7 +3,6 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import QueuePool
 
 load_dotenv()
 
@@ -23,9 +22,7 @@ def get_session() -> Session:
         DB_PORT = os.getenv("POSTGRES_PORT", "5432")
         DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-        engine = create_engine(
-            DATABASE_URL, poolclass=QueuePool, pool_size=10, max_overflow=20, pool_pre_ping=True, pool_recycle=3600
-        )
+        engine = create_engine(DATABASE_URL)
         SessionLocal = sessionmaker(bind=engine, autoflush=True, autocommit=False, future=True)
         return SessionLocal()
     except Exception as e:
