@@ -46,6 +46,8 @@ no_shows_list: dict[int, List[NoShow]] = {1: []}
 days_of_stay_for_replacement: dict[int, List[int]] = {1: []}
 personnels_for_replacement: dict[int, List[Dict[str, str]]] = {1: []}
 departments_for_replacement: dict[int, List[str]] = {1: []}
+stay_lengths = {}
+stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
 
 
 @app.get("/get-current-day", response_model=Dict[str, int])
@@ -87,16 +89,42 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
             personnels_for_replacement[day_for_simulation + 1] = []
             days_of_stay_for_replacement[day_for_simulation + 1] = []
             departments_for_replacement[day_for_simulation + 1] = []
+            stay_lengths.pop(day_for_simulation + 1)
     return {"day": day_for_simulation}
 
 
 @app.get("/reset-simulation", response_model=Dict[str, int])
 def reset_simulation() -> Dict[str, int]:
-    global patients_consent_dictionary, day_for_simulation, last_change, calls_in_time
+    global \
+        patients_consent_dictionary, \
+        day_for_simulation, \
+        last_change, \
+        calls_in_time, \
+        session, \
+        session_savepoints, \
+        latest_savepoint_index, \
+        occupancy_in_time, \
+        no_shows_in_time, \
+        no_shows_list, \
+        days_of_stay_for_replacement, \
+        personnels_for_replacement, \
+        departments_for_replacement, \
+        stay_lengths
     day_for_simulation = 1
     last_change = 1
     patients_consent_dictionary = {1: []}
     calls_in_time = {"Date": [1], "CallsNumber": [0]}
+    session = get_session()
+    session_savepoints = [session] + [None] * 19
+    latest_savepoint_index = 0
+    occupancy_in_time = {"Date": [1], "Occupancy": [100]}
+    no_shows_in_time = {"Date": [1], "NoShows": [0], "NoShowsNumber": [0]}
+    no_shows_list = {1: []}
+    days_of_stay_for_replacement = {1: []}
+    personnels_for_replacement = {1: []}
+    departments_for_replacement = {1: []}
+    stay_lengths = {}
+    stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
     logger.info("Resetting the simulation")
     return {"day": day_for_simulation}
 
@@ -114,12 +142,12 @@ def get_tables_and_statistics() -> ListOfTables:
         no_shows_in_time, \
         days_of_stay_for_replacement, \
         personnels_for_replacement, \
-        departments_for_replacement
+        departments_for_replacement, \
+        stay_lengths
     day = day_for_simulation
     rollback_flag = last_change
     consent_dict = patients_consent_dictionary.copy()
     calls_numbers_dict = calls_in_time.copy()
-    stay_lengths = {}
 
     def decrement_days_of_stay():
         session.query(BedAssignment).update({BedAssignment.days_of_stay: BedAssignment.days_of_stay - 1})
@@ -185,11 +213,12 @@ def get_tables_and_statistics() -> ListOfTables:
 
     def calculate_statistics() -> Statistics:
         # Calculation of average length of stay
-        avg_stay_length = calculate_average_in_dictionary(stay_lengths)
-        if len(stay_lengths) != 1:
-            max_key = max(stay_lengths.keys())
-            stay_lengths.pop(max_key)
-            avg_stay_length_diff = avg_stay_length - calculate_average_in_dictionary(stay_lengths)
+        stay_lengths_for_calculations = stay_lengths.copy()
+        avg_stay_length = calculate_average_in_dictionary(stay_lengths_for_calculations)
+        if len(stay_lengths_for_calculations) != 1:
+            max_key = max(stay_lengths_for_calculations.keys())
+            stay_lengths_for_calculations.pop(max_key)
+            avg_stay_length_diff = avg_stay_length - calculate_average_in_dictionary(stay_lengths_for_calculations)
         else:
             avg_stay_length_diff = "No previous day"
 
@@ -315,8 +344,6 @@ def get_tables_and_statistics() -> ListOfTables:
         rnd = random.Random()
         rnd.seed(43)
 
-        stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
-
         beds_number = get_beds_number()
 
         if rollback_flag == 1:
@@ -336,14 +363,12 @@ def get_tables_and_statistics() -> ListOfTables:
                 decrement_days_of_stay()
 
                 assigned_beds = session.query(BedAssignment.bed_id).scalar_subquery()
-                logger.info(assigned_beds)
                 beds = (
                     session.query(Bed.department_id, Bed.bed_id)
                     .filter(~Bed.bed_id.in_(assigned_beds))
                     .order_by(Bed.department_id, Bed.bed_id)
                     .all()
                 )
-                logger.info(beds)
 
                 bed_map = {}
                 for department_id, bed_id in beds:
