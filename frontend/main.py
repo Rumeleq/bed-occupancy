@@ -528,7 +528,8 @@ def call_next_patient_in_queue(
     agent_call(queue_df, bed_df, searched_days_of_stay, department, personnel, agent_lang)
 
 
-def get_list_of_tables_and_statistics() -> Optional[Dict]:
+@st.cache_data(show_spinner="Calculating the next day of simulation")
+def get_list_of_tables_and_statistics(day: int) -> Optional[Dict]:
     try:
         response = requests.get("http://backend:8000/get-tables-and-statistics")
         if response.status_code == 200:
@@ -549,6 +550,8 @@ def update_day(delta: int) -> None:
         st.session_state.pop("replacement_start_index", None)
         st.session_state.pop("phoned_ids", None)
         st.session_state.consent = False
+        if delta == -1:
+            get_list_of_tables_and_statistics.clear(st.session_state.day_for_simulation + 1)
     except Exception as e:
         st.session_state.error_message = f"{_('Failed to connect to the server')}: {e}"
 
@@ -644,7 +647,7 @@ elif st.session_state.button_pressed:
     st.session_state.button_pressed = False
 
 bed_df, queue_df, no_shows_df = None, None, None
-tables = get_list_of_tables_and_statistics()
+tables = get_list_of_tables_and_statistics(st.session_state.day_for_simulation)
 if tables:
     bed_df = pd.DataFrame(tables["AllBedAssignments"])
     no_shows_df = pd.DataFrame(tables["NoShows"])
