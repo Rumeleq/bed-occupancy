@@ -48,8 +48,9 @@ personnels_for_replacement: dict[int, List[Dict[str, str]]] = {1: []}
 departments_for_replacement: dict[int, List[str]] = {1: []}
 stay_lengths = {}
 stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
-random.seed(43)
-states_of_randomization = {1: random.getstate()}
+rnd = random.Random()
+rnd.seed(43)
+states_of_randomization = {1: rnd.getstate()}
 
 
 @app.get("/get-current-day", response_model=Dict[str, int])
@@ -80,7 +81,8 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
         days_of_stay_for_replacement, \
         departments_for_replacement, \
         stay_lengths, \
-        states_of_randomization
+        states_of_randomization, \
+        rnd
     if delta not in (-1, 1):
         return {"error": "Invalid delta value. Use -1 or 1."}
     if delta == 1 and day_for_simulation < 20 or delta == -1 and day_for_simulation > 1:
@@ -104,7 +106,7 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
             departments_for_replacement[day_for_simulation + 1] = []
             if day_for_simulation + 1 in stay_lengths.keys():
                 stay_lengths.pop(day_for_simulation + 1)
-            random.setstate(states_of_randomization[day_for_simulation])
+            rnd.setstate(states_of_randomization[day_for_simulation])
             states_of_randomization.pop(day_for_simulation + 1)
     return {"day": day_for_simulation}
 
@@ -126,7 +128,8 @@ def reset_simulation() -> Dict[str, int]:
         personnels_for_replacement, \
         departments_for_replacement, \
         stay_lengths, \
-        states_of_randomization
+        states_of_randomization, \
+        rnd
     day_for_simulation = 1
     last_change = 1
     patients_consent_dictionary = {1: []}
@@ -142,8 +145,8 @@ def reset_simulation() -> Dict[str, int]:
     departments_for_replacement = {1: []}
     stay_lengths = {}
     stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
-    random.seed(43)
-    states_of_randomization = {1: random.getstate()}
+    rnd.seed(43)
+    states_of_randomization = {1: rnd.getstate()}
     logger.info("Resetting the simulation")
     return {"day": day_for_simulation}
 
@@ -163,7 +166,8 @@ def get_tables_and_statistics() -> ListOfTables:
         personnels_for_replacement, \
         departments_for_replacement, \
         stay_lengths, \
-        states_of_randomization
+        states_of_randomization, \
+        rnd
     day = day_for_simulation
     rollback_flag = last_change
     consent_dict = patients_consent_dictionary.copy()
@@ -371,7 +375,7 @@ def get_tables_and_statistics() -> ListOfTables:
         if rollback_flag == 1:
             no_shows_list[day] = []
             for iteration in range(latest_savepoint_index, day - 1):
-                states_of_randomization[iteration + 2] = random.getstate()
+                states_of_randomization[iteration + 2] = rnd.getstate()
                 should_log = iteration == day - 2 and rollback_flag == 1
                 should_give_no_shows = iteration == day - 2
 
@@ -419,7 +423,7 @@ def get_tables_and_statistics() -> ListOfTables:
                 for i in range(min(len(queue), len(beds))):
                     entry = queue[i]
                     patient_id = entry.patient_id
-                    will_come = random.choice([True] * NO_SHOW_PROBABILITY_TRUE_COUNT + [False])
+                    will_come = rnd.choice([True] * NO_SHOW_PROBABILITY_TRUE_COUNT + [False])
                     if not will_come:
                         no_shows_number += 1
 
