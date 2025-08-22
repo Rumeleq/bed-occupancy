@@ -375,7 +375,6 @@ def get_tables_and_statistics() -> ListOfTables:
         if rollback_flag == 1:
             no_shows_list[day] = []
             for iteration in range(latest_savepoint_index, day - 1):
-                states_of_randomization[iteration + 2] = rnd.getstate()
                 should_log = iteration == day - 2 and rollback_flag == 1
                 should_give_no_shows = iteration == day - 2
 
@@ -508,10 +507,11 @@ def get_tables_and_statistics() -> ListOfTables:
 
                 no_shows_in_time["NoShowsNumber"].append(no_shows_number)
 
+                states_of_randomization[iteration + 2] = rnd.getstate()
+
             session_savepoints[latest_savepoint_index + 1] = session.begin_nested()
             if day - 1 != 0:
                 latest_savepoint_index += 1
-
         else:
             latest_savepoint_index -= 1
             session_savepoints[latest_savepoint_index].rollback()
