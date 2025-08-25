@@ -462,6 +462,7 @@ def agent_call(
         st.session_state.pop("replacement_start_index", None)
         st.session_state.pop("phoned_ids", None)
         st.session_state.button_pressed = True
+        get_list_of_tables_and_statistics.clear(st.session_state.day_for_simulation)
     elif call_results["verified"] is not True:
         main_tab.info(f"{name} {surname}{_("'s verification is unsuccessful")}.")
         st.session_state.consent = None
@@ -570,6 +571,8 @@ def sort_values_for_charts_by_dates(data) -> pd.DataFrame:
 
 def reset_day_for_simulation() -> None:
     try:
+        for day in range(2, st.session_state.day_for_simulation + 1):
+            get_list_of_tables_and_statistics.clear(day)
         response = requests.get("http://backend:8000/reset-simulation")
         st.session_state.day_for_simulation = response.json()["day"]
         st.session_state.pop("current_patient_index", None)
