@@ -1,4 +1,6 @@
 import gettext
+import hashlib
+import json
 from datetime import date, datetime, timedelta
 from typing import Callable, Dict, Optional
 
@@ -23,6 +25,7 @@ for key, default in {
     "replacement_start_index": 0,
     "transcriptions": [],
     "voice_language": "nationality",
+    "state_hashes": [],
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -51,6 +54,9 @@ voice_languages = ["pl", "ua", "en", _("nationality")]
 
 if "day_for_simulation" not in st.session_state or st.session_state.day_for_simulation is None:
     st.session_state.day_for_simulation = requests.get("http://backend:8000/get-current-day").json()["day"]
+    st.session_state.state_hashes = []
+    for day in range(1, st.session_state.day_for_simulation):
+        st.session_state.state_hashes.append((day, None))
 
 if st.session_state.voice_language not in voice_languages:
     st.session_state.voice_language = _("nationality")
@@ -462,8 +468,9 @@ def agent_call(
         st.session_state.pop("replacement_start_index", None)
         st.session_state.pop("phoned_ids", None)
         st.session_state.button_pressed = True
-        get_list_of_tables_and_statistics.clear(st.session_state.day_for_simulation)
+        st.session_state.state_hashes.append((st.session_state.day_for_simulation, int(idx) + 1))
     elif call_results["verified"] is not True:
+        requests.get("http://backend:8000/increase-calls-number")
         main_tab.info(f"{name} {surname}{_("'s verification is unsuccessful")}.")
         st.session_state.consent = None
     elif consent is False:
@@ -530,7 +537,7 @@ def call_next_patient_in_queue(
 
 
 @st.cache_data(show_spinner="Calculating the next day of simulation")
-def get_list_of_tables_and_statistics(day: int) -> Optional[Dict]:
+def get_list_of_tables_and_statistics(day: int, state_hashes: list[tuple]) -> Optional[Dict]:
     try:
         response = requests.get("http://backend:8000/get-tables-and-statistics")
         if response.status_code == 200:
@@ -551,8 +558,13 @@ def update_day(delta: int) -> None:
         st.session_state.pop("replacement_start_index", None)
         st.session_state.pop("phoned_ids", None)
         st.session_state.consent = False
-        if delta == -1:
-            get_list_of_tables_and_statistics.clear(st.session_state.day_for_simulation + 1)
+        if delta == 1:
+            st.session_state.state_hashes.append((st.session_state.day_for_simulation - 1, None))
+        elif delta == -1:
+            st.session_state.state_hashes = [
+                t for t in st.session_state.state_hashes if t[0] != st.session_state.day_for_simulation + 1
+            ]
+            st.session_state.state_hashes.pop(-1)
     except Exception as e:
         st.session_state.error_message = f"{_('Failed to connect to the server')}: {e}"
 
@@ -571,8 +583,8 @@ def sort_values_for_charts_by_dates(data) -> pd.DataFrame:
 
 def reset_day_for_simulation() -> None:
     try:
-        for day in range(2, st.session_state.day_for_simulation + 1):
-            get_list_of_tables_and_statistics.clear(day)
+        get_list_of_tables_and_statistics.clear()
+        st.session_state.state_hashes = []
         response = requests.get("http://backend:8000/reset-simulation")
         st.session_state.day_for_simulation = response.json()["day"]
         st.session_state.pop("current_patient_index", None)
@@ -650,7 +662,7 @@ elif st.session_state.button_pressed:
     st.session_state.button_pressed = False
 
 bed_df, queue_df, no_shows_df = None, None, None
-tables = get_list_of_tables_and_statistics(st.session_state.day_for_simulation)
+tables = get_list_of_tables_and_statistics(st.session_state.day_for_simulation, st.session_state.state_hashes)
 if tables:
     bed_df = pd.DataFrame(tables["AllBedAssignments"])
     no_shows_df = pd.DataFrame(tables["NoShows"])
