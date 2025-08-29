@@ -34,18 +34,20 @@ logging.config.dictConfig(config)
 
 app = FastAPI()
 day_for_simulation = 1
-last_change = 1
-patients_consent_dictionary: dict[int, list[int]] = {1: []}
-calls_in_time: dict[str, list] = {"Date": [1], "CallsNumber": [0]}
+occupied_beds_number: int = 0
+bed_map: Dict[int, Dict[int, List[int]]] = {1: {}}
+patients_consent_dictionary: Dict[int, list[int]] = {1: []}
+patients_to_be_added: Dict[int, list[int]] = {1: []}
+calls_in_time: Dict[str, list] = {"Date": [1], "CallsNumber": [0]}
 session = get_session()
 session_savepoints = [session] + [None] * 19
 latest_savepoint_index = 0
 occupancy_in_time = {"Date": [1], "Occupancy": [100]}
 no_shows_in_time = {"Date": [1], "NoShows": [0], "NoShowsNumber": [0]}
-no_shows_list: dict[int, List[NoShow]] = {1: []}
-days_of_stay_for_replacement: dict[int, List[int]] = {1: []}
-personnels_for_replacement: dict[int, List[Dict[str, str]]] = {1: []}
-departments_for_replacement: dict[int, List[str]] = {1: []}
+no_shows_list: Dict[int, List[NoShow]] = {1: []}
+days_of_stay_for_replacement: Dict[int, List[int]] = {1: []}
+personnels_for_replacement: Dict[int, List[Dict[str, str]]] = {1: []}
+departments_for_replacement: Dict[int, List[str]] = {1: []}
 stay_lengths = {}
 stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
 rnd = random.Random()
@@ -72,8 +74,8 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
     """
     global \
         day_for_simulation, \
-        last_change, \
         patients_consent_dictionary, \
+        patients_to_be_added, \
         calls_in_time, \
         occupancy_in_time, \
         no_shows_in_time, \
@@ -82,18 +84,20 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
         departments_for_replacement, \
         stay_lengths, \
         states_of_randomization, \
+        bed_map, \
         rnd
     if delta not in (-1, 1):
         return {"error": "Invalid delta value. Use -1 or 1."}
     if delta == 1 and day_for_simulation < 20 or delta == -1 and day_for_simulation > 1:
         day_for_simulation += delta
-        last_change = delta
         if delta == 1:
             patients_consent_dictionary[day_for_simulation] = []
+            patients_to_be_added[day_for_simulation] = []
             calls_in_time["Date"].append(day_for_simulation)
             calls_in_time["CallsNumber"].append(0)
         else:
             patients_consent_dictionary.pop(day_for_simulation + 1)
+            patients_to_be_added.pop(day_for_simulation + 1)
             calls_in_time["Date"].pop(day_for_simulation)
             calls_in_time["CallsNumber"].pop(day_for_simulation)
             occupancy_in_time["Date"].pop(day_for_simulation)
@@ -104,6 +108,7 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
             personnels_for_replacement[day_for_simulation + 1] = []
             days_of_stay_for_replacement[day_for_simulation + 1] = []
             departments_for_replacement[day_for_simulation + 1] = []
+            bed_map.pop(day_for_simulation + 1)
             if day_for_simulation + 1 in stay_lengths.keys():
                 stay_lengths.pop(day_for_simulation + 1)
             rnd.setstate(states_of_randomization[day_for_simulation])
@@ -115,8 +120,8 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
 def reset_simulation() -> Dict[str, int]:
     global \
         patients_consent_dictionary, \
+        patients_to_be_added, \
         day_for_simulation, \
-        last_change, \
         calls_in_time, \
         session, \
         session_savepoints, \
@@ -129,11 +134,16 @@ def reset_simulation() -> Dict[str, int]:
         departments_for_replacement, \
         stay_lengths, \
         states_of_randomization, \
+        occupied_beds_number, \
+        bed_map, \
         rnd
     day_for_simulation = 1
-    last_change = 1
+    occupied_beds_number = 0
+    bed_map = {1: {}}
     patients_consent_dictionary = {1: []}
+    patients_to_be_added = {1: []}
     calls_in_time = {"Date": [1], "CallsNumber": [0]}
+    session.close()
     session = get_session()
     session_savepoints = [session] + [None] * 19
     latest_savepoint_index = 0
@@ -152,12 +162,13 @@ def reset_simulation() -> Dict[str, int]:
 
 
 @app.get("/get-tables-and-statistics", response_model=ListOfTables)
-def get_tables_and_statistics() -> ListOfTables:
+def get_tables_and_statistics(should_add_patients_consents: bool, reversing_the_day: bool) -> ListOfTables:
     """
     Returns the current state of the simulation.
     :return: A JSON object with three lists: BedAssignment, PatientQueue, and NoShows.
     """
     global \
+        patients_to_be_added, \
         latest_savepoint_index, \
         session_savepoints, \
         occupancy_in_time, \
@@ -167,9 +178,10 @@ def get_tables_and_statistics() -> ListOfTables:
         departments_for_replacement, \
         stay_lengths, \
         states_of_randomization, \
+        occupied_beds_number, \
+        bed_map, \
         rnd
     day = day_for_simulation
-    rollback_flag = last_change
     consent_dict = patients_consent_dictionary.copy()
     calls_numbers_dict = calls_in_time.copy()
 
@@ -367,15 +379,15 @@ def get_tables_and_statistics() -> ListOfTables:
     try:
         beds_number = get_beds_number()
 
-        if rollback_flag == 1:
+        if not reversing_the_day:
             logger.info(f"Current simulation day: {day}")
         else:
             logger.info(f"Rollback of simulation to day {day}")
 
-        if rollback_flag == 1:
-            no_shows_list[day] = []
+        if not reversing_the_day or should_add_patients_consents:
             for iteration in range(latest_savepoint_index, day - 1):
-                should_log = iteration == day - 2 and rollback_flag == 1
+                no_shows_list[iteration + 2] = []
+                should_log = iteration == day - 2
                 should_give_no_shows = iteration == day - 2
 
                 if should_log:
@@ -391,11 +403,9 @@ def get_tables_and_statistics() -> ListOfTables:
                     .all()
                 )
 
-                bed_map = {}
+                bed_map[iteration + 2] = {}
                 for department_id, bed_id in beds:
-                    bed_map.setdefault(department_id, []).append(bed_id)
-
-                logger.info
+                    bed_map[iteration + 2].setdefault(department_id, []).append(bed_id)
 
                 occupied_beds_number = beds_number - len(beds)
                 no_shows_number = 0
@@ -415,9 +425,9 @@ def get_tables_and_statistics() -> ListOfTables:
 
                 assignments_to_create = []
 
-                days_of_stay_for_replacement[day] = []
-                personnels_for_replacement[day] = []
-                departments_for_replacement[day] = []
+                days_of_stay_for_replacement[iteration + 2] = []
+                personnels_for_replacement[iteration + 2] = []
+                departments_for_replacement[iteration + 2] = []
 
                 for i in range(min(len(queue), len(beds))):
                     entry = queue[i]
@@ -433,14 +443,14 @@ def get_tables_and_statistics() -> ListOfTables:
                                 personnel.personnel_member.first_name + " " + personnel.personnel_member.last_name
                             ] = personnel.personnel_member.role
 
-                        days_of_stay_for_replacement[day].append(entry.days_of_stay)
-                        personnels_for_replacement[day].append(personnel_data)
-                        departments_for_replacement[day].append(entry.medical_procedure.department.name)
+                        days_of_stay_for_replacement[iteration + 2].append(entry.days_of_stay)
+                        personnels_for_replacement[iteration + 2].append(personnel_data)
+                        departments_for_replacement[iteration + 2].append(entry.medical_procedure.department.name)
 
                         delete_patient_by_queue_id_from_queue(entry.queue_id)
                         if should_give_no_shows:
                             no_show = NoShow(patient_id=patient_id, patient_name=get_patient_name_by_id(patient_id))
-                            no_shows_list[day].append(no_show)
+                            no_shows_list[iteration + 2].append(no_show)
                         if should_log:
                             logger.info(f"No-show: {no_show.patient_name}")
                     else:
@@ -450,7 +460,7 @@ def get_tables_and_statistics() -> ListOfTables:
 
                         assignments_to_create.append(
                             (
-                                bed_map[entry.medical_procedure.department_id][0],
+                                bed_map[iteration + 2][entry.medical_procedure.department_id][0],
                                 patient_id,
                                 entry.procedure_id,
                                 entry.days_of_stay,
@@ -459,42 +469,16 @@ def get_tables_and_statistics() -> ListOfTables:
                         )
 
                         delete_patient_by_queue_id_from_queue(entry.queue_id)
-                        bed_map[entry.medical_procedure.department_id].pop(0)
+                        bed_map[iteration + 2][entry.medical_procedure.department_id].pop(0)
                         occupied_beds_number += 1
-
-                queue_entries = (
-                    session.query(PatientQueue).filter(PatientQueue.queue_id.in_(consent_dict[iteration + 2])).all()
-                )
-                queue_entries_map = {entry.queue_id: entry for entry in queue_entries}
-
-                for queue_id in consent_dict[iteration + 2]:
-                    queue_entry = queue_entries_map[queue_id]
-
-                    if iteration + 2 not in stay_lengths:
-                        stay_lengths[iteration + 2] = []
-                    stay_lengths[iteration + 2].append(queue_entry.days_of_stay)
-
-                    assignments_to_create.append(
-                        (
-                            bed_map[queue_entry.medical_procedure.department_id][0],
-                            queue_entry.patient_id,
-                            queue_entry.procedure_id,
-                            queue_entry.days_of_stay,
-                            queue_entry.personnel_queue_assignment,
-                        )
-                    )
-
-                    delete_patient_by_queue_id_from_queue(queue_id)
-                    bed_map[queue_entry.medical_procedure.department_id].pop(0)
-                    occupied_beds_number += 1
 
                 assign_beds_to_patients(assignments_to_create, should_log)
 
                 consent_count = len(consent_dict[iteration + 2])
 
-                days_of_stay_for_replacement[day] = days_of_stay_for_replacement[day][consent_count:]
-                personnels_for_replacement[day] = personnels_for_replacement[day][consent_count:]
-                departments_for_replacement[day] = departments_for_replacement[day][consent_count:]
+                days_of_stay_for_replacement[iteration + 2] = days_of_stay_for_replacement[iteration + 2][consent_count:]
+                personnels_for_replacement[iteration + 2] = personnels_for_replacement[iteration + 2][consent_count:]
+                departments_for_replacement[iteration + 2] = departments_for_replacement[iteration + 2][consent_count:]
 
                 occupancy_in_time["Date"].append(iteration + 2)
                 occupancy_in_time["Occupancy"].append(occupied_beds_number / beds_number * 100)
@@ -509,8 +493,45 @@ def get_tables_and_statistics() -> ListOfTables:
 
                 states_of_randomization[iteration + 2] = rnd.getstate()
 
-            session_savepoints[latest_savepoint_index + 1] = session.begin_nested()
-            if day - 1 != 0:
+            queue_entries = session.query(PatientQueue).filter(PatientQueue.queue_id.in_(patients_to_be_added[day])).all()
+            queue_entries_map = {entry.queue_id: entry for entry in queue_entries}
+            assignments_to_create = []
+
+            for queue_id in patients_to_be_added[day]:
+                queue_entry = queue_entries_map[queue_id]
+
+                if day not in stay_lengths:
+                    stay_lengths[day] = []
+                stay_lengths[day].append(queue_entry.days_of_stay)
+
+                assignments_to_create.append(
+                    (
+                        bed_map[day][queue_entry.medical_procedure.department_id][0],
+                        queue_entry.patient_id,
+                        queue_entry.procedure_id,
+                        queue_entry.days_of_stay,
+                        queue_entry.personnel_queue_assignment,
+                    )
+                )
+
+                delete_patient_by_queue_id_from_queue(queue_id)
+                bed_map[day][queue_entry.medical_procedure.department_id].pop(0)
+                occupied_beds_number += 1
+                patients_to_be_added[day].remove(queue_id)
+                days_of_stay_for_replacement[day] = days_of_stay_for_replacement[day][1:]
+                personnels_for_replacement[day] = personnels_for_replacement[day][1:]
+                departments_for_replacement[day] = departments_for_replacement[day][1:]
+
+            occupancy_in_time["Occupancy"].pop(-1)
+            occupancy_in_time["Occupancy"].append(occupied_beds_number / beds_number * 100)
+            assign_beds_to_patients(assignments_to_create, True)
+
+            if latest_savepoint_index + 2 == day:
+                session_savepoints[latest_savepoint_index + 1] = session.begin_nested()
+            elif latest_savepoint_index + 1 == day:
+                session_savepoints[latest_savepoint_index] = session.begin_nested()
+
+            if day - 1 != 0 and not should_add_patients_consents and latest_savepoint_index + 1 < day:
                 latest_savepoint_index += 1
         else:
             latest_savepoint_index -= 1
@@ -623,6 +644,7 @@ def get_tables_and_statistics() -> ListOfTables:
 @app.get("/add-patient-to-approvers")
 def add_patient_to_approvers(queue_id: int) -> None:
     patients_consent_dictionary[day_for_simulation].append(queue_id)
+    patients_to_be_added[day_for_simulation].append(queue_id)
 
 
 @app.get("/increase-calls-number")

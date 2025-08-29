@@ -63,6 +63,10 @@ if "openai_client" not in st.session_state:
     except Exception as e:
         st.error(_("Failed to initialize OpenAI client. Please check your API key and configuration."))
         st.session_state.openai_client = None
+if "should_add_patients_consents" not in st.session_state:
+    st.session_state.should_add_patients_consents = False
+if "reversing_the_simulation" not in st.session_state:
+    st.session_state.reversing_the_simulation = False
 
 today = datetime.today().date()
 
@@ -368,6 +372,7 @@ def agent_call(
         st.session_state.pop("replacement_start_index", None)
         st.session_state.pop("phoned_ids", None)
         st.session_state.button_pressed = True
+        st.session_state.should_add_patients_consents = True
     elif call_results["verified"] is not True:
         main_tab.info(f"{name} {surname}{_("'s verification is unsuccessful")}.")
         st.session_state.consent = None
@@ -434,9 +439,15 @@ def call_next_patient_in_queue(
     agent_call(queue_df, bed_df, searched_days_of_stay, department, personnel, agent_lang)
 
 
-def get_list_of_tables_and_statistics() -> Optional[Dict]:
+def get_list_of_tables_and_statistics(should_add_patients_consents: bool, reversing_the_simulation: bool) -> Optional[Dict]:
     try:
-        response = requests.get("http://backend:8000/get-tables-and-statistics")
+        response = requests.get(
+            "http://backend:8000/get-tables-and-statistics",
+            params={
+                "should_add_patients_consents": should_add_patients_consents,
+                "reversing_the_day": reversing_the_simulation,
+            },
+        )
         if response.status_code == 200:
             return response.json()
         else:
@@ -455,6 +466,8 @@ def update_day(delta: int) -> None:
         st.session_state.pop("replacement_start_index", None)
         st.session_state.pop("phoned_ids", None)
         st.session_state.consent = False
+        if delta == -1:
+            st.session_state.reversing_the_simulation = True
     except Exception as e:
         st.session_state.error_message = f"{_('Failed to connect to the server')}: {e}"
 
@@ -547,7 +560,11 @@ elif st.session_state.button_pressed:
     st.session_state.button_pressed = False
 
 bed_df, queue_df, no_shows_df = None, None, None
-tables = get_list_of_tables_and_statistics()
+tables = get_list_of_tables_and_statistics(
+    st.session_state.should_add_patients_consents, st.session_state.reversing_the_simulation
+)
+st.session_state.should_add_patients_consents = False
+st.session_state.reversing_the_simulation = False
 if tables:
     bed_df = pd.DataFrame(tables["AllBedAssignments"])
     no_shows_df = pd.DataFrame(tables["NoShows"])
