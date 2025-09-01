@@ -45,6 +45,7 @@ main_tab, list_tab, statistics_tab, transcript_tab = st.tabs(
     [_("Current state"), _("List view"), _("Data analysis"), _("Transcriptions")]
 )
 main_tab.title(_("Bed Assignments"))
+list_tab.title(_("Bed Assignments"))
 
 ui_languages = ["en", "pl"]
 voice_languages = ["pl", "ua", "en", _("nationality")]
@@ -424,6 +425,7 @@ def agent_call(
 
     if idx < 0:
         main_tab.warning(_("No more patients in queue."))
+        list_tab.warning(_("No more patients in queue."))
         st.session_state.button_pressed = True
         return
 
@@ -445,6 +447,7 @@ def agent_call(
     except Exception as e:
         logger.info(str(e))
         main_tab.error(_("Failed to initiate the call. Please try again later."), icon="⚠️")
+        list_tab.error(_("Failed to initiate the call. Please try again later."), icon="⚠️")
         return
 
     consent = call_results["consent"]
@@ -452,11 +455,13 @@ def agent_call(
 
     if call_results["called"] is False:
         main_tab.warning(_("It is necessary to fill in the field with the phone number in the settings section!"), icon="⚠️")
+        list_tab.warning(_("It is necessary to fill in the field with the phone number in the settings section!"), icon="⚠️")
     elif consent is True:
         requests.get("http://backend:8000/add-patient-to-approvers", params={"queue_id": idx + 1})
         requests.get("http://backend:8000/increase-calls-number")
 
         main_tab.success(f"{name} {surname} {_('agreed to reschedule')}.")
+        list_tab.success(f"{name} {surname} {_('agreed to reschedule')}.")
 
         st.session_state.pop("current_patient_index", None)
         st.session_state.pop("replacement_start_index", None)
@@ -464,10 +469,12 @@ def agent_call(
         st.session_state.button_pressed = True
     elif call_results["verified"] is not True:
         main_tab.info(f"{name} {surname}{_("'s verification is unsuccessful")}.")
+        list_tab.info(f"{name} {surname}{_("'s verification is unsuccessful")}.")
         st.session_state.consent = None
     elif consent is False:
         requests.get("http://backend:8000/increase-calls-number")
         main_tab.error(f"{name} {surname} {_('did not agree to reschedule')}.")
+        list_tab.error(f"{name} {surname} {_('did not agree to reschedule')}.")
         st.session_state.phoned_ids.append(idx + 1)
         st.session_state.current_patient_index = find_next_patient_to_call(
             searched_days_of_stay, queue_df, bed_df, department, personnel
@@ -478,6 +485,7 @@ def agent_call(
             st.session_state.pop("current_patient_index", None)
     else:
         main_tab.info(f"{name} {surname}{_("'s consent is unknown.")}.")
+        list_tab.info(f"{name} {surname}{_("'s consent is unknown.")}.")
 
     if "transcript" in call_results and len(call_results["transcript"]) > 0:
         st.session_state.transcriptions.append(
@@ -535,9 +543,11 @@ def get_list_of_tables_and_statistics() -> Optional[Dict]:
             return response.json()
         else:
             main_tab.error(_("Failed to fetch data from the server."))
+            list_tab.error(_("Failed to fetch data from the server."))
             return None
     except Exception as e:
         main_tab.error(f"{_('Failed to connect to the server')}: {e}")
+        list_tab.error(f"{_('Failed to connect to the server')}: {e}")
         return None
 
 
@@ -677,6 +687,9 @@ if "current_patient_index" not in st.session_state:
         st.session_state.current_patient_index = len(queue_df) - 1
 
 main_tab.header(
+    f"{_('Day')} {st.session_state.day_for_simulation} - {calculate_simulation_date(st.session_state.day_for_simulation).strftime('%Y-%m-%d')}"
+)
+list_tab.header(
     f"{_('Day')} {st.session_state.day_for_simulation} - {calculate_simulation_date(st.session_state.day_for_simulation).strftime('%Y-%m-%d')}"
 )
 
