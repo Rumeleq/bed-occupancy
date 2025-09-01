@@ -66,10 +66,12 @@ def update_day(delta: int = Query(...)) -> Dict[str, int]:
             patients_consent_dictionary[day_for_simulation] = []
             calls_in_time["Date"].append(day_for_simulation)
             calls_in_time["CallsNumber"].append(0)
+            logger.info(f"Current simulation day: {day_for_simulation}")
         else:
             patients_consent_dictionary.pop(day_for_simulation + 1)
             calls_in_time["Date"].pop(day_for_simulation)
             calls_in_time["CallsNumber"].pop(day_for_simulation)
+            logger.info(f"Rollback of simulation to day {day_for_simulation}")
     return {"day": day_for_simulation}
 
 
@@ -300,11 +302,6 @@ def get_tables_and_statistics() -> ListOfTables:
         stay_lengths[1] = [d[0] for d in session.query(BedAssignment.days_of_stay).all()]
 
         beds_number = get_beds_number()
-
-        if rollback_flag == 1:
-            logger.info(f"Current simulation day: {day}")
-        else:
-            logger.info(f"Rollback of simulation to day {day}")
 
         no_shows_list: List[NoShow] = []
 
@@ -552,6 +549,7 @@ def add_patient_to_approvers(queue_id: int) -> None:
 @app.get("/increase-calls-number")
 def increase_calls_number() -> None:
     calls_in_time["CallsNumber"][day_for_simulation - 1] += 1
+    logger.info(f"Current simulation day: {day_for_simulation}")
 
 
 @app.get("/get-patient-data")
