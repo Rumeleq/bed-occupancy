@@ -141,6 +141,17 @@ def get_tables_and_statistics() -> ListOfTables:
                 {PatientQueue.queue_id: PatientQueue.queue_id - 1}, synchronize_session="fetch"
             )
 
+    def delete_many_patients_by_queue_ids_from_queue(queue_ids: list[int]):
+        entries = session.query(PatientQueue).filter(PatientQueue.queue_id.in_(queue_ids)).all()
+        for entry in entries:
+            for assignment in entry.personnel_queue_assignment:
+                session.delete(assignment)
+            session.delete(entry)
+
+        remaining_entries = session.query(PatientQueue).order_by(PatientQueue.queue_id).all()
+        for idx, entry in enumerate(remaining_entries, start=1):
+            entry.queue_id = idx
+
     def get_patient_name_by_id(patient_id: int) -> str:
         patient = session.query(Patient).filter_by(patient_id=patient_id).first()
         return f"{patient.first_name} {patient.last_name}" if patient else "Unknown"
@@ -342,6 +353,7 @@ def get_tables_and_statistics() -> ListOfTables:
             days_of_stay_for_replacement = []
             personnels_for_replacement = []
             departments_for_replacement = []
+            queue_ids_to_remove = []
 
             for i in range(min(len(queue), len(beds))):
                 entry = queue[i]
@@ -361,7 +373,7 @@ def get_tables_and_statistics() -> ListOfTables:
                     personnels_for_replacement.append(personnel_data)
                     departments_for_replacement.append(entry.medical_procedure.department.name)
 
-                    delete_patient_by_queue_id_from_queue(entry.queue_id)
+                    queue_ids_to_remove.append(entry.queue_id)
                     no_show = NoShow(patient_id=patient_id, patient_name=get_patient_name_by_id(patient_id))
                     if should_give_no_shows:
                         no_shows_list.append(no_show)
@@ -380,10 +392,12 @@ def get_tables_and_statistics() -> ListOfTables:
                         entry.personnel_queue_assignment,
                         should_log,
                     )
-                    delete_patient_by_queue_id_from_queue(entry.queue_id)
+                    queue_ids_to_remove.append(entry.queue_id)
                     bed_map[entry.medical_procedure.department_id].pop(0)
                     occupied_beds_number += 1
                     bed_iterator += 1
+
+            delete_many_patients_by_queue_ids_from_queue(queue_ids_to_remove)
 
             for queue_id in consent_dict[iteration + 2]:
                 queue_entry = (
